@@ -5,7 +5,7 @@ from tests.conftest import xray_png
 
 
 def test_tamper_demo_keeps_seal_and_is_caught(client, device, tmp_path):
-    seal = client.post("/api/seal", files={"file": ("x.png", xray_png())}, data={"device_id": device["id"]}).json()
+    seal = client.post("/api/seal", files={"file": ("x.png", xray_png())}, headers=device["auth"]).json()
     sealed = tmp_path / "x.png"
     sealed.write_bytes(client.get(seal["download_url"]).content)
 
