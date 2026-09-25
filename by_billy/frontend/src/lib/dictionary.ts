@@ -308,6 +308,7 @@ const dictionary = {
       ru: "Организация «{org}» зарегистрирована. Теперь можно добавлять устройства и печатать снимки.",
       en: "“{org}” is registered. You can now add devices and seal images.",
     },
+    goInbox: { uz: "Kiruvchi suratlarga o'tish", ru: "Перейти ко входящим снимкам", en: "Go to incoming images" },
     goSeal: { uz: "Muhrlashga o'tish", ru: "Перейти к печати", en: "Go to sealing" },
     goDashboard: { uz: "Boshqaruv paneliga o'tish", ru: "Перейти в панель управления", en: "Go to dashboard" },
     again: { uz: "Yana ro'yxatdan o'tish", ru: "Зарегистрировать ещё раз", en: "Register another" },

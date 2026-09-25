@@ -38,7 +38,8 @@ export default function LoginPage() {
     await new Promise((res) => setTimeout(res, 400));
     setSubmitting(false);
     login(type === "legal" ? { type: "legal", name: name.trim(), org: name.trim() } : { type: "individual", name: name.trim() });
-    router.push(type === "legal" ? "/dashboard" : "/seal");
+    // A doctor's home is the inbox: images arrive already checked, only red ones need a look.
+    router.push(type === "legal" ? "/dashboard" : "/inbox");
   };
 
   return (

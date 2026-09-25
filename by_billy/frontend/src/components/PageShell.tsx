@@ -101,9 +101,14 @@ export default function PageShell({
                 </span>
                 <h2 className="mt-4 text-lg font-semibold">{t(dictionary.gate.title)}</h2>
                 <p className="mt-1 text-sm text-muted">{t(dictionary.gate.subtitle)}</p>
-                <Link href="/register" className={`${buttonClass("dark")} mt-5`}>
-                  {t(dictionary.gate.cta)}
-                </Link>
+                <div className="mt-5 flex flex-wrap justify-center gap-2">
+                  <Link href="/register" className={buttonClass("dark")}>
+                    {t(dictionary.gate.cta)}
+                  </Link>
+                  <Link href="/login" className={buttonClass("ghost")}>
+                    {t(dictionary.nav.login)}
+                  </Link>
+                </div>
               </div>
             ) : (
               children

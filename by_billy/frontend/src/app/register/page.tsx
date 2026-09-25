@@ -136,8 +136,8 @@ export default function RegisterPage() {
           <h2 className="text-xl font-semibold">{t(d.successTitle)}</h2>
           <p className="text-sm text-muted">{message}</p>
           <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-center">
-            <Link href={type === "legal" ? "/dashboard" : "/seal"} className={buttonClass("dark")}>
-              {t(type === "legal" ? d.goDashboard : d.goSeal)}
+            <Link href={type === "legal" ? "/dashboard" : "/inbox"} className={buttonClass("dark")}>
+              {t(type === "legal" ? d.goDashboard : d.goInbox)}
             </Link>
             <Button variant="ghost" onClick={reset}>
               {t(d.again)}
