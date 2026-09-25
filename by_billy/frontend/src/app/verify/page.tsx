@@ -96,7 +96,7 @@ export default function VerifyPage() {
               )}
             </div>
             <p className="mt-1 text-sm opacity-90">{headline ? t(headline.desc) : ""}</p>
-            {result.status === "forged" && result.reason && (
+            {(result.status === "forged" || result.status === "tampered") && result.reason && (
               <p className="mt-1 text-sm font-medium">{t(d.forgedReasons[result.reason])}</p>
             )}
             {result.warning && (
@@ -141,6 +141,12 @@ export default function VerifyPage() {
               {result.ai_note && (
                 <Card className="border-amber-200 bg-amber-50">
                   <p className="text-sm text-amber-900">{t(d.aiNote[result.ai_note])}</p>
+                </Card>
+              )}
+
+              {result.phi_warning && (
+                <Card className="border-amber-200 bg-amber-50">
+                  <p className="text-sm text-amber-900">{t(d.phiWarning[result.phi_warning])}</p>
                 </Card>
               )}
 

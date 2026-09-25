@@ -32,10 +32,14 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+function ensureBackendConfigured(): void {
   if (!API_BASE_URL) {
     throw new ApiError(503, "Backend is not configured: set NEXT_PUBLIC_API_URL or explicitly enable NEXT_PUBLIC_USE_MOCK=1");
   }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  ensureBackendConfigured();
   const isForm = init?.body instanceof FormData;
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -84,6 +88,7 @@ const realApi = {
   // Goes through the Next.js route handler (src/app/api/seal/route.ts), not the backend
   // directly: the device token that authorizes sealing is a server-only secret (P0-1).
   seal: (file: File) => {
+    ensureBackendConfigured();
     const form = new FormData();
     form.append("file", file);
     return fetch("/api/seal", { method: "POST", body: form }).then(async (res) => {
@@ -102,18 +107,22 @@ const realApi = {
   getModels: () => request<AiModel[]>("/models"),
   // Admin actions (P1-04) go through Next.js route handlers that add the admin token
   // server-side, same reasoning as seal() above — never a bearer token in the browser.
-  startCrashTest: (body: CrashTestRequest) =>
-    fetch("/api/crash-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(
+  startCrashTest: (body: CrashTestRequest) => {
+    ensureBackendConfigured();
+    return fetch("/api/crash-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(
       async (res) => {
         const text = await res.text();
         if (!res.ok) throw new ApiError(res.status, detailOf(text) || res.statusText);
         return JSON.parse(text) as { job_id: number };
       }
-    ),
+    );
+  },
+
   getCrashTest: (jobId: number) => request<CrashTestJob>(`/crash-test/${jobId}`),
 
-  createPassport: (modelId: number, crashTestId: number) =>
-    fetch("/api/passport", {
+  createPassport: (modelId: number, crashTestId: number) => {
+    ensureBackendConfigured();
+    return fetch("/api/passport", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model_id: modelId, crash_test_id: crashTestId }),
@@ -121,7 +130,8 @@ const realApi = {
       const text = await res.text();
       if (!res.ok) throw new ApiError(res.status, detailOf(text) || res.statusText);
       return JSON.parse(text) as Passport;
-    }),
+    });
+  },
   getPassport: (id: number) => request<Passport>(`/passport/${id}`),
   // The backend PDF exists in Uzbek and Russian; English UI gets the Uzbek PDF.
   passportPdfUrl: (id: number, lang: "uz" | "ru" | "en") =>

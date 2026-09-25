@@ -15,6 +15,7 @@ import {
   ArrowRightIcon,
 } from "@/components/icons";
 import { FLOW } from "@/lib/flow";
+import { USE_MOCK } from "@/lib/api";
 
 const services = [
   { key: "seal", icon: SealIcon, href: "/seal" },
@@ -62,6 +63,8 @@ export default function Home() {
             </Link>
           </div>
 
+          {USE_MOCK && (
+            <>
           {/* Glass mock card */}
           <div className="glass relative mx-auto mt-14 max-w-4xl overflow-hidden rounded-[2rem] p-6 text-left shadow-2xl shadow-accent/15 sm:p-10">
             <div className="pointer-events-none absolute -left-16 top-10 h-64 w-64 rounded-full bg-accent/30 blur-3xl" />
@@ -109,6 +112,8 @@ export default function Home() {
               </Link>
             </div>
           </div>
+            </>
+          )}
         </section>
 
         {/* How it works */}

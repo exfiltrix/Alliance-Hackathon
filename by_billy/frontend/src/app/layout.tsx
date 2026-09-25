@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "MedSeal — muhr va antivirus tibbiy suratlar uchun",
   description:
-    "MedSeal proves a medical image is authentic and that the AI reading it hasn't been fooled.",
+    "MedSeal checks medical image integrity and measures how easily the AI reading it can be fooled; it is not a clinical clearance.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

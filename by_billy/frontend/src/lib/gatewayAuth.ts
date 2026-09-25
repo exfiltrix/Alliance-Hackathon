@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 
 // Server-only (Node.js runtime — Next 16 Proxy defaults to it, so Node's `crypto` is available
 // here and in route handlers alike). Never import this from a "use client" file.
@@ -8,15 +8,11 @@ import { timingSafeEqual } from "crypto";
 // (first line of defence) and each protected route handler (defence in depth).
 
 function safeEqual(a: string, b: string): boolean {
-  const bufA = Buffer.from(a);
-  const bufB = Buffer.from(b);
-  if (bufA.length !== bufB.length) {
-    // Burn the same time as a real comparison so a mismatched length isn't distinguishable
-    // from a mismatched value via timing (an early `return false` here would leak length).
-    timingSafeEqual(bufA, bufA);
-    return false;
-  }
-  return timingSafeEqual(bufA, bufB);
+  // Hash first so timingSafeEqual always receives equal-length buffers. This avoids
+  // exposing the configured credential length through a fast-path length check.
+  const digestA = createHash("sha256").update(a, "utf8").digest();
+  const digestB = createHash("sha256").update(b, "utf8").digest();
+  return timingSafeEqual(digestA, digestB);
 }
 
 export type GatewayAuthResult = { ok: true } | { ok: false; status: 401 | 503; message: string };
@@ -38,7 +34,9 @@ export function checkGatewayAuth(authorizationHeader: string | null): GatewayAut
     const sep = decoded.indexOf(":");
     const u = sep === -1 ? decoded : decoded.slice(0, sep);
     const p = sep === -1 ? "" : decoded.slice(sep + 1);
-    if (safeEqual(u, user) && safeEqual(p, pass)) return { ok: true };
+    const userMatches = safeEqual(u, user);
+    const passwordMatches = safeEqual(p, pass);
+    if (userMatches && passwordMatches) return { ok: true };
   }
 
   return { ok: false, status: 401, message: "Authentication required" };

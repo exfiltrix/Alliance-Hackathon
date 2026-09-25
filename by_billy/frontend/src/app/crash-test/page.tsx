@@ -198,6 +198,11 @@ export default function CrashTestPage() {
                 <span className="text-2xl text-muted"> / 10</span>
               </p>
               <p className="mt-3 text-xs text-muted">{t(d.scoreFormula)}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted">
+                <span>{t(d.imagesRequested)}: {job.n_requested ?? "—"}</span>
+                <span>{t(d.imagesLoaded)}: {job.n_images ?? "—"}</span>
+              </div>
+              <p className="mt-2 text-xs text-muted">{t(d.protocolLabel)}: {t(d.protocolValue)}</p>
               {job.protocol_compliant !== true && (
                 <p className="mt-3 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-900">
                   {t(d.protocolNotMet)}

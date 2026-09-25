@@ -19,11 +19,14 @@ export type SealResponse = {
 
 export type VerifyStatus = "authentic" | "tampered" | "unsigned" | "forged";
 
-export type ForgedReason = "ledger_entry_modified" | "bad_signature" | "device_revoked" | "unknown_device";
+// CRY-02: the device has no valid root-signed certificate (a forged device row, or a swapped
+// public key) — checked before the hash chain, so it wins over ledger_entry_modified.
+export type ForgedReason = "ledger_entry_modified" | "bad_signature" | "device_revoked" | "unknown_device" | "untrusted_device";
 // P0-5: appears on `tampered` too, when display metadata (RescaleIntercept, Laterality...)
 // was edited without touching pixels. P1-03: appears when the seal was found by content, not
-// by ID, and something about the matched image differs.
-export type TamperedReason = ForgedReason | "metadata_changed" | "seal_id_removed";
+// by ID, and something about the matched image differs. CRY-01: patient_mismatch means every
+// tile and pixel is untouched, but the DICOM PatientID hashes to a different seal record.
+export type TamperedReason = ForgedReason | "metadata_changed" | "seal_id_removed" | "patient_mismatch";
 
 export type VerifyResponse = {
   status: VerifyStatus;
@@ -39,7 +42,14 @@ export type VerifyResponse = {
   reason?: TamperedReason;
   changed_meta?: string[]; // tag names, only with reason === "metadata_changed"
   // Non-fatal: the device was revoked AFTER this seal was made, so it is still trusted.
-  warning?: "device_revoked_later" | "seal_id_missing";
+  // CRY-02: device_not_certified only appears when MEDSEAL_REQUIRE_DEVICE_CERT=0 (migration mode).
+  warning?: "device_revoked_later" | "seal_id_missing" | "device_not_certified";
+  // CRY-01: whether the upload's DICOM PatientID matches the seal's patient_ref. not_available
+  // covers no PatientID on the upload, no MEDSEAL_PATIENT_SALT configured, or a pre-CRY-01 row.
+  patient_check?: "matched" | "mismatch" | "not_available";
+  // IMG-03: the DICOM declares BurnedInAnnotation=YES; pixels may show identifying text that
+  // de-identification cannot remove.
+  phi_warning?: "burned_in_annotation";
   verify_ms?: number;
   preview_png: string;
   // null when the AI is off on the backend; the public API intentionally omits Grad-CAM output.
@@ -88,12 +98,14 @@ export type CrashTestJob = {
 
 export type Verdict = "allowed" | "allowed_with_conditions" | "not_allowed";
 
-export type PassportCondition = "shield_required" | "seal_required" | "doctor_decides" | "retest_required";
+export type PassportCondition = "shield_required" | "seal_required" | "doctor_decides" | "retest_required" | "clinical_validation_required";
 
 export type Passport = {
   id: number;
   created_at: string;
   organisation: string;
+  fingerprint: string;
+  verify_url: string;
   model: AiModel;
   robustness: {
     score: number;
@@ -109,6 +121,7 @@ export type Passport = {
     psnr: Record<string, number>;
     example?: CrashTestJob["example"] | null;
   };
+  clinical_validation: { dataset: string; n: number; auc: number; sensitivity: number; specificity: number } | null;
   shield: {
     available: boolean;
     compatible: boolean;
@@ -117,6 +130,11 @@ export type Passport = {
     false_positive_rate?: number;
     detection_pgd_eps1?: number | null;
     detection_fgsm_eps1?: number | null;
+    confidence_intervals?: {
+      detection_pgd_eps1: { successes: number; n: number; lower: number; upper: number };
+      false_positive_rate: { successes: number; n: number; lower: number; upper: number };
+    };
+    adaptive_attack_tested?: boolean;
   };
   pipeline: {
     devices_active: number;

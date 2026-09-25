@@ -70,7 +70,7 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
                 <p className="text-sm text-muted">{passport.model.version}</p>
               </div>
               <div className={`rounded-2xl border px-4 py-3 text-right ${verdictStyle[passport.verdict]}`}>
-                <p className="text-xs opacity-80">{t(d.verdict)}</p>
+                <p className="text-xs opacity-80">{t(d.verdictLabel)}</p>
                 <p className="text-lg font-semibold">{t(d.verdicts[passport.verdict])}</p>
               </div>
             </div>
@@ -103,18 +103,35 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
                   <Field label={t(d.intendedUse)} value={passport.model.intended_use} />
                 )}
                 {passport.organisation && <Field label={t(d.organisation)} value={passport.organisation} />}
+                <Field label={t(d.fingerprint)} value={passport.fingerprint} mono />
+                <Field label={t(d.verifyPath)} value={passport.verify_url} mono />
                 <Field label={t(d.shieldCompatible)} value={yesNo(passport.shield.compatible)} />
                 {passport.shield.available && (
                   <>
                     <Field label={t(d.shieldDetection)} value={pct(passport.shield.detection_pgd_eps1)} />
                     <Field label={t(d.shieldFalseAlarms)} value={pct(passport.shield.false_positive_rate, 1)} />
+                    {passport.shield.confidence_intervals && (
+                      <>
+                        <Field
+                          label={t(d.shieldCi)}
+                          value={`${pct(passport.shield.confidence_intervals.detection_pgd_eps1.lower)} / ${pct(passport.shield.confidence_intervals.detection_pgd_eps1.upper)}`}
+                        />
+                        <Field
+                          label={t(d.shieldFalseAlarms)}
+                          value={`${pct(passport.shield.confidence_intervals.false_positive_rate.lower, 2)} / ${pct(passport.shield.confidence_intervals.false_positive_rate.upper, 2)}`}
+                        />
+                      </>
+                    )}
+                    <p className="col-span-full text-xs text-amber-800">{t(d.adaptiveNote)}</p>
                   </>
                 )}
                 <Field label={t(d.activeDevices)} value={passport.pipeline.devices_active} />
                 <Field label={t(d.sealsCount)} value={passport.pipeline.seals} />
                 <Field label={t(d.ledgerIntegrity)} value={passport.pipeline.ledger_ok ? t(dictionary.common.yes) : t(dictionary.common.no)} />
                 <Field label={t(d.crashTest)} value={`${r.crash_test_id} · ${r.method.toUpperCase()}`} />
-                <Field label={t(d.testedOn)} value={r.n_images} />
+                <Field label={t(d.imagesRequested)} value={r.n_requested} />
+                <Field label={t(d.imagesLoaded)} value={r.n_images} />
+                <Field label={t(d.protocolLabel)} value={t(d.protocolValue)} />
                 <Field
                   label={t(d.date)}
                   value={new Date(passport.created_at).toLocaleDateString(localeOf(lang))}

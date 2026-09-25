@@ -17,6 +17,7 @@ export default function Footer() {
           <div>
             <p className="text-sm font-semibold">MedSeal</p>
             <p className="text-xs text-muted">{t(dictionary.home.footerTagline)}</p>
+            <p className="mt-1 text-xs text-muted">{t(dictionary.home.footerGateway)}</p>
           </div>
         </div>
         <p className="text-xs text-muted">

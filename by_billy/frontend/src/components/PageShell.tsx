@@ -8,9 +8,6 @@ import Footer from "./Footer";
 import { FlowSteps, NextStepCard } from "./FlowSteps";
 import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
-import { USE_MOCK } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
-import { buttonClass } from "./ui";
 import type { FlowKey } from "@/lib/flow";
 
 export default function PageShell({
@@ -19,7 +16,6 @@ export default function PageShell({
   icon: Icon,
   step,
   backHref = "/",
-  publicPage = false,
   children,
 }: {
   title: string;
@@ -27,14 +23,10 @@ export default function PageShell({
   icon?: ComponentType<SVGProps<SVGSVGElement>>;
   step?: FlowKey;
   backHref?: string;
-  /** Skips the "register first" gate — only the register page itself needs this. */
-  publicPage?: boolean;
   children?: ReactNode;
 }) {
   const router = useRouter();
   const { t } = useLanguage();
-  const session = useAuth();
-  const locked = !publicPage && !session;
 
   const goBack = () => {
     if (window.history.length > 1) router.back();
@@ -83,34 +75,8 @@ export default function PageShell({
             </div>
           </div>
 
-          {USE_MOCK && !locked && (
-            <p className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800 print:hidden">
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-              {t(dictionary.common.mockMode)}
-            </p>
-          )}
-
-          <div className="fade-up mt-8">
-            {locked ? (
-              <div className="glass mx-auto max-w-md rounded-2xl p-8 text-center">
-                <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-accent-soft text-accent">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="4" y="10" width="16" height="10" rx="2" />
-                    <path d="M8 10V7a4 4 0 018 0v3" />
-                  </svg>
-                </span>
-                <h2 className="mt-4 text-lg font-semibold">{t(dictionary.gate.title)}</h2>
-                <p className="mt-1 text-sm text-muted">{t(dictionary.gate.subtitle)}</p>
-                <Link href="/register" className={`${buttonClass("dark")} mt-5`}>
-                  {t(dictionary.gate.cta)}
-                </Link>
-              </div>
-            ) : (
-              children
-            )}
-          </div>
-
-          {step && !locked && <NextStepCard current={step} />}
+          <div className="fade-up mt-8">{children}</div>
+          {step && <NextStepCard current={step} />}
         </section>
       </main>
       <Footer />
