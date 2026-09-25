@@ -40,6 +40,12 @@ const dictionary = {
       ru: "От момента съёмки до сертификации AI-модели — всё в одной платформе.",
     },
     open: { uz: "Ochish", ru: "Открыть" },
+    howTitle: { uz: "Qanday ishlaydi", ru: "Как это работает" },
+    howSubtitle: {
+      uz: "To'rt qadam: suratni olishdan AI modelini tasdiqlashgacha. Istalgan qadamdan boshlang.",
+      ru: "Четыре шага: от съёмки до допуска AI-модели. Начните с любого шага.",
+    },
+    stepLabel: { uz: "Qadam", ru: "Шаг" },
     disclaimer: {
       uz: "Muhr — matematik jihatdan aniq natija. Detektiv va Qalqon esa faqat ehtimollikni ko'rsatadi. Yakuniy qarorni har doim shifokor qabul qiladi.",
       ru: "Печать — математически точный результат. Детектив и Щит показывают только вероятность. Итоговое решение всегда принимает врач.",
@@ -47,6 +53,28 @@ const dictionary = {
     footerTagline: {
       uz: "Tibbiy suratlar va tibbiy AI uchun muhr va antivirus.",
       ru: "Печать и антивирус для медицинских снимков и медицинского AI.",
+    },
+  },
+  flow: {
+    label: { uz: "Yo'l", ru: "Путь" },
+    next: { uz: "Keyingi qadam", ru: "Следующий шаг" },
+    steps: {
+      seal: {
+        title: { uz: "Muhrlash", ru: "Печать" },
+        desc: { uz: "Suratni skanerdan chiqishi bilan imzolang", ru: "Подпишите снимок сразу после съёмки" },
+      },
+      verify: {
+        title: { uz: "Tekshirish", ru: "Проверка" },
+        desc: { uz: "Shifokor ko'rishidan oldin haqiqiyligini tekshiring", ru: "Проверьте подлинность до показа врачу" },
+      },
+      crash: {
+        title: { uz: "Sinov hujumi", ru: "Краш-тест" },
+        desc: { uz: "AI modelini ko'rinmas hujum bilan sinang", ru: "Испытайте AI-модель невидимой атакой" },
+      },
+      passport: {
+        title: { uz: "Pasport", ru: "Паспорт" },
+        desc: { uz: "Model uchun xavfsizlik pasportini oling", ru: "Получите паспорт безопасности модели" },
+      },
     },
   },
   services: {

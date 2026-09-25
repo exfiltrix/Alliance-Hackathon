@@ -7,6 +7,7 @@ import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
 import { api } from "@/lib/api";
 import type { Passport, Verdict } from "@/lib/types";
+import { PassportIcon } from "@/components/icons";
 
 const d = dictionary.passport;
 
@@ -47,7 +48,7 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
   const pdfUrl = passport ? api.passportPdfUrl(passport.id) : "";
 
   return (
-    <PageShell title={t(d.title)} subtitle={t(d.subtitle)} backHref="/crash-test">
+    <PageShell title={t(d.title)} subtitle={t(d.subtitle)} icon={PassportIcon} step="passport" backHref="/crash-test">
       {error && <ErrorBox message={error} onRetry={retry} />}
 
       {!passport && !error && (

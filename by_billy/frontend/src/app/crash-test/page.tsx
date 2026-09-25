@@ -9,6 +9,7 @@ import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
 import { api, pngSrc } from "@/lib/api";
 import type { AiModel, AttackMethod, CrashTestJob } from "@/lib/types";
+import { CrashTestIcon } from "@/components/icons";
 
 const d = dictionary.crash;
 const EPS = [0.5, 1, 2, 4];
@@ -109,7 +110,7 @@ export default function CrashTestPage() {
   const done = job?.status === "done";
 
   return (
-    <PageShell title={t(d.title)} subtitle={t(d.subtitle)}>
+    <PageShell title={t(d.title)} subtitle={t(d.subtitle)} icon={CrashTestIcon} step="crash">
       {!done && (
         <Card className="space-y-5">
           <div>

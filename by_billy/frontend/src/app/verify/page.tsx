@@ -8,6 +8,7 @@ import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
 import { USE_MOCK, api, pngSrc } from "@/lib/api";
 import type { VerifyResponse, VerifyStatus } from "@/lib/types";
+import { VerifyIcon } from "@/components/icons";
 
 const d = dictionary.verify;
 
@@ -50,7 +51,7 @@ export default function VerifyPage() {
   };
 
   return (
-    <PageShell title={t(d.title)} subtitle={t(d.subtitle)}>
+    <PageShell title={t(d.title)} subtitle={t(d.subtitle)} icon={VerifyIcon} step="verify">
       {!result && (
         <div className="space-y-4">
           <UploadDropzone file={file} onFile={onFile} disabled={loading} />

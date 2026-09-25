@@ -9,6 +9,7 @@ import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
 import { api, backendUrl } from "@/lib/api";
 import type { Device, SealResponse } from "@/lib/types";
+import { SealIcon } from "@/components/icons";
 
 const d = dictionary.seal;
 
@@ -77,7 +78,7 @@ export default function SealPage() {
   const device = devices.find((x) => x.id === result?.device_id);
 
   return (
-    <PageShell title={t(d.title)} subtitle={t(d.subtitle)}>
+    <PageShell title={t(d.title)} subtitle={t(d.subtitle)} icon={SealIcon} step="seal">
       {result ? (
         <Card className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">

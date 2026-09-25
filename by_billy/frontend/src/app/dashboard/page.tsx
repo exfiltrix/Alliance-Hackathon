@@ -8,6 +8,7 @@ import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
 import { api } from "@/lib/api";
 import type { Stats } from "@/lib/types";
+import { ChartIcon } from "@/components/icons";
 
 const d = dictionary.dashboard;
 
@@ -43,7 +44,7 @@ export default function DashboardPage() {
     : [];
 
   return (
-    <PageShell title={t(d.title)} subtitle={t(d.subtitle)}>
+    <PageShell title={t(d.title)} subtitle={t(d.subtitle)} icon={ChartIcon}>
       {error && <ErrorBox message={error} onRetry={retry} />}
 
       {!stats && !error && (
