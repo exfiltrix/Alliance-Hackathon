@@ -47,6 +47,7 @@ class Seal(Base):
     root_hex: Mapped[str] = mapped_column(String(64))
     meta_hash_hex: Mapped[str] = mapped_column(String(64), default="")  # sha256 of imaging.meta_fields; see P0-5
     meta_json: Mapped[str] = mapped_column(Text, default="{}")  # the fields themselves, for changed_meta on verify
+    dhash_hex: Mapped[str] = mapped_column(String(16), default="")  # imaging.dhash; content-based recovery, P1-03
     sig_hex: Mapped[str] = mapped_column(String(128))
     prev_hash: Mapped[str] = mapped_column(String(64), unique=True)  # unique => the chain cannot fork
     entry_hash: Mapped[str] = mapped_column(String(64), unique=True)

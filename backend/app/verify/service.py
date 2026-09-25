@@ -1,8 +1,8 @@
 """Verify an uploaded image against the ledger.
 
-Status order matters: unsigned (no record) -> forged (record not authentic) ->
-tampered (tile mismatch) -> authentic. Changed tiles are only meaningful when
-the record itself is authentic.
+Status order matters: unsigned (no record, no content match) -> forged (record not authentic) ->
+tampered (tile or metadata mismatch) -> authentic. Changed tiles are only meaningful when the
+record itself is authentic.
 """
 import json
 import time
@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.ai import hooks
 from app.imaging import LoadedImage, meta_fields, meta_hash, to_grayscale
 from app.models import Device, Verification
-from app.seal import core, keys, ledger
+from app.seal import core, keys, ledger, recovery
 from app.verify.preview import render_preview
 
 DOCTOR_NOTE = "Final decision is made by the doctor."
@@ -38,10 +38,44 @@ def _check_row(session: Session, row) -> tuple[Device | None, str | None, str | 
     return device, None, warning
 
 
+def _metadata_changed(image: LoadedImage, row) -> tuple[bool, list[str]]:
+    """P0-5: RescaleIntercept, Laterality, WindowCenter etc. never touch pixel data, so they
+    need their own comparison — changed_tiles alone cannot see them."""
+    if not row.meta_hash_hex:
+        return False, []
+    current_meta = meta_fields(image)
+    if meta_hash(current_meta).hex() == row.meta_hash_hex:
+        return False, []
+    stored_meta = json.loads(row.meta_json or "{}")
+    changed = sorted(k for k in set(stored_meta) | set(current_meta) if stored_meta.get(k) != current_meta.get(k))
+    return True, changed
+
+
 def verify_upload(session: Session, image: LoadedImage) -> dict:
     t0 = time.perf_counter()
     row = ledger.find_by_uid(session, image.uid) if image.uid else None
-    result = {"status": "", "uid": image.uid, "device": None, "seal_id": None, "changed_tiles": [], "tile": None}
+    matched_by: str | None = "uid" if row is not None else None
+
+    # P1-03: the image's ID was stripped, replaced, or its metadata chunk was dropped by a
+    # re-save — fall back to content: same shape/dtype and >=50% identical tiles against a
+    # previously sealed image (see app.seal.recovery for why this cannot false-match unrelated
+    # X-rays).
+    if row is None:
+        shape_json = json.dumps(list(image.px.shape))
+        match = recovery.find_content_match(session, image.px, shape_json, str(image.px.dtype))
+        if match:
+            row, _fraction = match
+            matched_by = "content"
+
+    result = {
+        "status": "",
+        "uid": image.uid,
+        "device": None,
+        "seal_id": None,
+        "changed_tiles": [],
+        "tile": None,
+        "matched_by": matched_by,
+    }
 
     if row is None:
         result["status"] = "unsigned"
@@ -50,19 +84,18 @@ def verify_upload(session: Session, image: LoadedImage) -> dict:
         result.update(device=device.name if device else None, seal_id=row.id, tile=row.tile)
         if reason:
             result.update(status="forged", reason=reason)
+        elif matched_by == "content":
+            changed = core.changed_tiles(image.px, ledger.to_record(row))
+            meta_changed, _ = _metadata_changed(image, row)
+            if changed or meta_changed:
+                result.update(
+                    status="tampered", reason="seal_id_removed", changed_tiles=[list(k) for k in changed]
+                )
+            else:
+                result.update(status="authentic", warning="seal_id_missing")
         else:
             changed = core.changed_tiles(image.px, ledger.to_record(row))
-            # P0-5: RescaleIntercept, Laterality, WindowCenter etc. never touch pixel data, so
-            # they need their own comparison — changed_tiles alone cannot see them.
-            meta_changed, changed_meta = False, []
-            if row.meta_hash_hex:
-                current_meta = meta_fields(image)
-                if meta_hash(current_meta).hex() != row.meta_hash_hex:
-                    meta_changed = True
-                    stored_meta = json.loads(row.meta_json or "{}")
-                    changed_meta = sorted(
-                        k for k in set(stored_meta) | set(current_meta) if stored_meta.get(k) != current_meta.get(k)
-                    )
+            meta_changed, changed_meta = _metadata_changed(image, row)
             result.update(
                 status="tampered" if (changed or meta_changed) else "authentic",
                 changed_tiles=[list(k) for k in changed],

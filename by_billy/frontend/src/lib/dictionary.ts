@@ -467,13 +467,28 @@ const dictionary = {
         ru: "Изменены медицинские метаданные (например, шкала HU или сторона снимка).",
         en: "Medical metadata was changed (e.g. the HU scale or image laterality).",
       },
+      seal_id_removed: {
+        uz: "Suratning muhr identifikatori olib tashlangan yoki almashtirilgan, lekin tarkibi orqali asl muhr topildi — va u bilan solishtirilganda surat o'zgartirilgan.",
+        ru: "Идентификатор печати снимка удалён или заменён, но по содержимому найдена исходная печать — и по сравнению с ней снимок изменён.",
+        en: "The image's seal ID was removed or replaced, but the original seal was found by content — and compared to it, the image has changed.",
+      },
     },
     metadataChanged: { uz: "O'zgargan maydonlar", ru: "Изменённые поля", en: "Changed fields" },
+    matchedByContent: {
+      uz: "Identifikator emas, surat tarkibi bo'yicha topildi",
+      ru: "Найдено не по идентификатору, а по содержимому снимка",
+      en: "Found by image content, not by its ID",
+    },
     warnings: {
       device_revoked_later: {
         uz: "Bu surat muhrlangandan keyin qurilma bekor qilingan. Muhr hali ham haqiqiy, lekin qurilmaga endi ishonib bo'lmaydi.",
         ru: "Устройство было отозвано уже после печати этого снимка. Печать по-прежнему подлинная, но устройству больше нельзя доверять.",
         en: "The device was revoked after this image was sealed. The seal is still authentic, but the device can no longer be trusted.",
+      },
+      seal_id_missing: {
+        uz: "Surat identifikatori (muhr belgisi) yo'qolgan — ehtimol, qayta saqlashda. Tarkibi orqali muhrlangan asl nusxa topildi va bir xilligi tasdiqlandi.",
+        ru: "У снимка пропал идентификатор печати — вероятно, из-за пересохранения. По содержимому найден исходный запечатанный снимок, и совпадение подтверждено.",
+        en: "The image's seal ID is missing — likely from being re-saved. The original sealed image was found by content and confirmed identical.",
       },
     },
     heatmap: { uz: "Issiqlik xaritasi", ru: "Тепловая карта", en: "Heatmap" },

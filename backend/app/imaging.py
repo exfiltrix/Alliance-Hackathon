@@ -139,6 +139,34 @@ def to_grayscale(px: np.ndarray) -> np.ndarray:
     return lum.astype(px.dtype)
 
 
+def _to_uint8(px: np.ndarray) -> np.ndarray:
+    """1st-99th percentile window so 16-bit CT/high-dynamic-range views are usable at 8 bits."""
+    if px.dtype == np.uint8:
+        return px
+    lo, hi = np.percentile(px, [1, 99])
+    if hi <= lo:
+        hi = lo + 1
+    return np.clip((px.astype(np.float64) - lo) * 255.0 / (hi - lo), 0, 255).astype(np.uint8)
+
+
+def dhash(gray: np.ndarray) -> str:
+    """64-bit difference hash (9x8 grayscale resize, horizontal-neighbour comparison) for
+    content-based seal recovery when an image's ID was stripped or replaced (P1-03). This is a
+    similarity index only — it is never part of the signed format and carries no security
+    guarantee by itself; the actual match is confirmed by tile-hash overlap (see app.seal.recovery)."""
+    small = Image.fromarray(_to_uint8(gray)).resize((9, 8), Image.Resampling.LANCZOS)
+    arr = np.asarray(small, dtype=np.int16)
+    bits = arr[:, 1:] > arr[:, :-1]
+    value = 0
+    for b in bits.flatten():
+        value = (value << 1) | int(b)
+    return f"{value:016x}"
+
+
+def hamming_distance(a_hex: str, b_hex: str) -> int:
+    return bin(int(a_hex, 16) ^ int(b_hex, 16)).count("1")
+
+
 def assign_uid(image: LoadedImage) -> str:
     """Give an unsealed image an ID. DICOM gets a SOPInstanceUID, PNG a UUID."""
     if image.uid is None:

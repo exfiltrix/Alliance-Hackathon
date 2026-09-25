@@ -7,6 +7,12 @@ from app import db
 from app.config import settings
 from app.db import init_engine
 from app.routers import crash_test, devices, passport, seal, stats, verify
+from app.seal.recovery import backfill_dhash
+
+
+def _read_sealed_file(row) -> bytes | None:
+    path = settings.storage_dir / row.file_name
+    return path.read_bytes() if path.exists() else None
 
 
 @asynccontextmanager
@@ -14,6 +20,9 @@ async def lifespan(app: FastAPI):
     init_engine()
     with db.SessionLocal() as session:
         crash_test.seed_models(session)
+        # P1-03: fills dhash_hex for rows sealed before this column existed. Read-only over the
+        # stored files, writes only dhash_hex — never a hashed/signed field.
+        backfill_dhash(session, _read_sealed_file)
     yield
 
 

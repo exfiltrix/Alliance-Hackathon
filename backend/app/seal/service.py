@@ -6,9 +6,9 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.imaging import LoadedImage, assign_uid, meta_fields, meta_hash, sealed_file_bytes
+from app.imaging import LoadedImage, assign_uid, dhash, meta_fields, meta_hash, sealed_file_bytes, to_grayscale
 from app.models import Device, Seal
-from app.seal import core, keys, ledger
+from app.seal import core, keys, ledger, recovery
 
 
 class SealError(Exception):
@@ -29,6 +29,17 @@ def seal_upload(session: Session, image: LoadedImage, device_id: int) -> tuple[S
         if core.changed_tiles(image.px, ledger.to_record(existing)):
             raise SealError(409, f"Image {image.uid} is already sealed with different pixels (seal {existing.id})")
         return existing, 0.0
+
+    # P1-03 seal-side guard: without this, "strip the ID, edit, seal as new" would mint a fresh,
+    # perfectly valid seal for a forged derivative of an already-sealed image.
+    if image.uid is None:
+        shape_json = json.dumps(list(image.px.shape))
+        match = recovery.find_content_match(session, image.px, shape_json, str(image.px.dtype))
+        if match:
+            candidate, fraction = match
+            if fraction >= 1.0:
+                return candidate, 0.0  # untouched, just missing its chunk — same as re-sealing today
+            raise SealError(409, f"Image is derived from sealed image #{candidate.id}")
 
     uid = assign_uid(image)
     fields = meta_fields(image)
@@ -52,6 +63,7 @@ def seal_upload(session: Session, image: LoadedImage, device_id: int) -> tuple[S
         root_hex=record["root"].hex(),
         meta_hash_hex=mh.hex(),
         meta_json=json.dumps(fields, sort_keys=True, separators=(",", ":")),
+        dhash_hex=dhash(to_grayscale(image.px)),
         sig_hex=record["sig"].hex(),
         file_name=file_name,
     )

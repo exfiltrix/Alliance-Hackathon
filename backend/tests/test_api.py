@@ -145,6 +145,127 @@ def test_dicom_rescale_intercept_change_is_detected(client, device, ct_path):
     assert "RescaleIntercept" in result["changed_meta"]
 
 
+# ---------- P1-03: content-based recovery when the seal ID was stripped/replaced ----------
+
+def _strip_png_uid(sealed: bytes) -> bytes:
+    """Re-saves the PNG with no text chunks at all — what a re-save in an editor that drops
+    metadata would produce."""
+    img = Image.open(io.BytesIO(sealed))
+    buf = io.BytesIO()
+    Image.fromarray(np.array(img), img.mode).save(buf, "PNG")
+    return buf.getvalue()
+
+
+def _set_png_uid(sealed: bytes, new_uid: str) -> bytes:
+    from PIL import PngImagePlugin
+
+    img = Image.open(io.BytesIO(sealed))
+    info = PngImagePlugin.PngInfo()
+    info.add_text("medseal_uid", new_uid)
+    buf = io.BytesIO()
+    Image.fromarray(np.array(img), img.mode).save(buf, "PNG", pnginfo=info)
+    return buf.getvalue()
+
+
+def test_content_recovery_tampered_uid_stripped(client, device):
+    _, sealed = seal(client, device, xray_png())
+    px = png_pixels(sealed)
+    px[300, 70] ^= 1  # same edit as test_png_one_pixel_change -> tile (288, 64)
+    edited = _strip_png_uid(replace_png_pixels(sealed, px))
+
+    result = verify(client, edited)
+    assert result["status"] == "tampered"
+    assert result["reason"] == "seal_id_removed"
+    assert result["matched_by"] == "content"
+    assert result["changed_tiles"] == [[288, 64]]
+
+
+def test_content_recovery_tampered_uid_replaced(client, device):
+    _, sealed = seal(client, device, xray_png())
+    px = png_pixels(sealed)
+    px[300, 70] ^= 1
+    edited = _set_png_uid(replace_png_pixels(sealed, px), "1.2.3.4.not-a-real-seal")
+
+    result = verify(client, edited)
+    assert result["status"] == "tampered"
+    assert result["reason"] == "seal_id_removed"
+    assert result["matched_by"] == "content"
+    assert result["changed_tiles"] == [[288, 64]]
+
+
+def test_content_recovery_untouched_resave_without_chunk(client, device):
+    _, sealed = seal(client, device, xray_png())
+    resaved = _strip_png_uid(sealed)  # pixels identical, just no medseal_uid chunk
+
+    result = verify(client, resaved)
+    assert result["status"] == "authentic"
+    assert result["warning"] == "seal_id_missing"
+    assert result["matched_by"] == "content"
+
+
+def test_content_recovery_does_not_false_match_unrelated_image(client, device):
+    seal(client, device, xray_png(seed=0))
+    unrelated = _strip_png_uid(xray_png(seed=99))  # never sealed, same shape, different content
+
+    result = verify(client, unrelated)
+    assert result["status"] == "unsigned"
+    assert result["matched_by"] is None
+
+
+def test_content_recovery_blocks_reseal_of_stripped_and_edited_image(client, device):
+    _, sealed = seal(client, device, xray_png())
+    px = png_pixels(sealed)
+    px[300, 70] ^= 1
+    forged = _strip_png_uid(replace_png_pixels(sealed, px))
+
+    r = client.post("/api/seal", files={"file": ("x.png", forged)}, headers=device["auth"])
+    assert r.status_code == 409
+
+
+def test_content_recovery_dicom_replaced_sop_instance_uid(client, device, ct_path):
+    raw = open(ct_path, "rb").read()
+    _, sealed = seal(client, device, raw, "ct.dcm")
+
+    ds = pydicom.dcmread(io.BytesIO(sealed))
+    px = ds.pixel_array.copy()
+    px[35, 20] += 1
+    ds.PixelData = px.tobytes()
+    from pydicom.uid import generate_uid
+
+    ds.SOPInstanceUID = generate_uid()  # attacker swaps the ID after editing
+    buf = io.BytesIO()
+    ds.save_as(buf, enforce_file_format=True)
+
+    result = verify(client, buf.getvalue(), "ct.dcm")
+    assert result["status"] == "tampered"
+    assert result["reason"] == "seal_id_removed"
+    assert result["matched_by"] == "content"
+
+
+def test_dhash_backfill_does_not_affect_the_ledger(client, device, tmp_path):
+    """dhash_hex is a similarity index only, never part of the signed/hashed format (P1-03)."""
+    from app.seal.recovery import backfill_dhash
+
+    _, sealed = seal(client, device, xray_png())
+    before = client.get("/api/ledger/check").json()
+    assert before == {"ok": True, "entries": 1, "broken": []}
+
+    with db.SessionLocal() as s:
+        row = s.get(Seal, 1)
+        real_dhash, row.dhash_hex = row.dhash_hex, ""
+        s.commit()
+
+        def read_file(r):
+            return (tmp_path / "storage" / r.file_name).read_bytes()
+
+        updated = backfill_dhash(s, read_file)
+        assert updated == 1
+        assert s.get(Seal, 1).dhash_hex == real_dhash
+
+    after = client.get("/api/ledger/check").json()
+    assert after == {"ok": True, "entries": 1, "broken": []}
+
+
 def test_reseal_same_image_is_idempotent(client, device):
     first, sealed = seal(client, device, xray_png())
     again, _ = seal(client, device, sealed)

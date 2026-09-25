@@ -154,24 +154,53 @@ export const mockApi: Api = {
     };
     const note = "Final decision is made by the doctor.";
     let res: VerifyResponse;
-    if (/fake|tamper/.test(name)) {
+    if (/nochunk|resave/.test(name)) {
+      // P1-03: untouched image, ID chunk missing — recovered by content.
+      res = {
+        status: "authentic",
+        uid: null,
+        device: "KT-01",
+        matched_by: "content",
+        warning: "seal_id_missing",
+        changed_tiles: [],
+        preview_png: await fileToPreview(file, []),
+        shield,
+        note,
+      };
+    } else if (/stripped/.test(name)) {
+      // P1-03: tampered, and the ID was also stripped — recovered by content, not by UID.
+      const tiles: [number, number][] = [[96, 288], [96, 320]];
+      res = {
+        status: "tampered",
+        uid: null,
+        device: "KT-01",
+        matched_by: "content",
+        reason: "seal_id_removed",
+        changed_tiles: tiles,
+        preview_png: await fileToPreview(file, tiles),
+        shield,
+        note,
+      };
+    } else if (/fake|tamper/.test(name)) {
       const tiles: [number, number][] = [[96, 288], [96, 320], [128, 288], [128, 320]];
       res = {
         status: "tampered",
         uid: "1.3.6.1.4.1.9328",
         device: "KT-01",
+        matched_by: "uid",
         changed_tiles: tiles,
         preview_png: await fileToPreview(file, tiles),
         shield,
         note,
       };
     } else if (/forged/.test(name)) {
-      res = { status: "forged", uid: "1.3.6.1.4.1.9328", device: "KT-01", changed_tiles: [], preview_png: await fileToPreview(file, []), shield, note };
+      res = { status: "forged", uid: "1.3.6.1.4.1.9328", device: "KT-01", matched_by: "uid", changed_tiles: [], preview_png: await fileToPreview(file, []), shield, note };
     } else if (sealedNames.has(file.name) || /sealed|muhr/.test(name)) {
-      res = { status: "authentic", uid: "1.3.6.1.4.1.9328", device: "KT-01", changed_tiles: [], preview_png: await fileToPreview(file, []), shield, note };
+      res = { status: "authentic", uid: "1.3.6.1.4.1.9328", device: "KT-01", matched_by: "uid", changed_tiles: [], preview_png: await fileToPreview(file, []), shield, note };
     } else {
       res = {
         status: "unsigned",
+        matched_by: null,
         changed_tiles: [],
         preview_png: await fileToPreview(file, []),
         detective: { probability: 0.87, heatmap_png: heatmap(), experimental: false },

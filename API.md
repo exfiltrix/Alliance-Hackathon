@@ -32,7 +32,7 @@ there is no `device_id` field anymore (a client can no longer seal as an arbitra
 ```
 - `401` missing/invalid device token, `403` the device is revoked.
 - Sealing the same image again returns the existing seal (same `seal_id`).
-- `409` if the image ID is already sealed with different pixels.
+- `409` if the image ID is already sealed with different pixels, or (P1-03) if an image with no ID is a partial content match of an already-sealed image ("Image is derived from sealed image #N").
 - `root` is 64 hex chars; show a short form in the UI (e.g. first 8 + "…").
 - The frontend never talks to this endpoint directly: `by_billy/frontend/src/app/api/seal/route.ts` is a Next.js
   route handler that adds the token server-side from `MEDSEAL_DEVICE_TOKEN` (see `by_billy/frontend/.env.example`).
@@ -59,6 +59,7 @@ Python backend still separately requires the device bearer token (P0-1) regardle
 { "status": "authentic | tampered | unsigned | forged",
   "uid": "…", "device": "KT-01", "seal_id": 12,
   "changed_tiles": [[64,16],[64,32]], "tile": 32,
+  "matched_by": "uid | content | null",
   "warning": "device_revoked_later",
   "verify_ms": 1.1,
   "preview_png": "base64…",
@@ -71,6 +72,7 @@ Python backend still separately requires the device bearer token (P0-1) regardle
 - `forged`: extra field `reason` = `ledger_entry_modified | bad_signature | device_revoked | unknown_device`; `changed_tiles` is empty (tiles are not compared against an untrusted record).
 - `tampered` can also carry `reason: "metadata_changed"` + `changed_meta: [tag names]` when a display-affecting DICOM tag (RescaleSlope/Intercept, WindowCenter/Width, Laterality, PixelSpacing, ...) was edited without touching any pixel — those tags never touch tile hashes, so they are bound into the signature separately (P0-5).
 - `warning` (optional, on `authentic`/`tampered` only) = `device_revoked_later`: the device was revoked **after** this particular seal was made, so the seal itself is still trusted — revocation is not retroactive. A seal made at/after the device's `revoked_at` is `forged`/`device_revoked` instead, not a warning.
+- **P1-03 content-based recovery.** `matched_by` = `"uid"` (the normal case: the record was found by the image's own ID), `"content"` (the ID was missing, stripped or replaced — the record was found instead by comparing pixels against every previously sealed image of the same shape/dtype), or `null` (`unsigned` only — no match at all). On a `"content"` match: all tiles and metadata identical → `authentic` + `warning: "seal_id_missing"` (an untouched image whose ID chunk was dropped, e.g. by a re-save that strips PNG text chunks); anything different → `tampered` + `reason: "seal_id_removed"` + `changed_tiles` computed against the matched record. `POST /seal` also refuses (`409`) to seal an ID-less image that is a partial (not exact) content match of something already sealed — that would otherwise let an attacker strip the ID, edit the image, and get a brand-new "clean" seal for a forged derivative.
 - `detective` key is present only when `status == "unsigned"` (a sealed image is checked by the seal, exactly). `detective` / `shield` are `null` when the AI is off (`MEDSEAL_AI=0`, torch not installed, detective not trained) — the UI must handle `null` for both.
 - `detective.probability` = chance the image was edited (0..1). `heatmap_png` is a 448×448 RGB PNG of the 224×224 picture the model sees (centre square crop of the image), with a Grad-CAM heatmap where the detective looked; show it next to the preview, not over it. `experimental: true` → add an "experimental" badge (the detective scored below AUC 0.9 on held-out images). ~50 ms; the first call after startup ~1 s.
 - `shield` runs on every status, including `authentic`: the seal proves where the image came from, the shield checks whether its pixels carry an adversarial attack (an attacked image can be sealed too).

@@ -114,6 +114,9 @@ export default function VerifyPage() {
                 <Card className="grid gap-4">
                   {result.device && <Field label={t(d.device)} value={result.device} />}
                   {result.uid && <Field label="UID" value={result.uid} mono />}
+                  {result.matched_by === "content" && (
+                    <p className="text-xs text-amber-700">{t(d.matchedByContent)}</p>
+                  )}
                   {result.status === "tampered" && (
                     <Field label={t(d.changedTiles)} value={result.changed_tiles.length} />
                   )}

@@ -21,8 +21,9 @@ export type VerifyStatus = "authentic" | "tampered" | "unsigned" | "forged";
 
 export type ForgedReason = "ledger_entry_modified" | "bad_signature" | "device_revoked" | "unknown_device";
 // P0-5: appears on `tampered` too, when display metadata (RescaleIntercept, Laterality...)
-// was edited without touching pixels.
-export type TamperedReason = ForgedReason | "metadata_changed";
+// was edited without touching pixels. P1-03: appears when the seal was found by content, not
+// by ID, and something about the matched image differs.
+export type TamperedReason = ForgedReason | "metadata_changed" | "seal_id_removed";
 
 export type VerifyResponse = {
   status: VerifyStatus;
@@ -31,10 +32,14 @@ export type VerifyResponse = {
   seal_id?: number | null;
   changed_tiles: [number, number][];
   tile?: number | null;
+  // P1-03: how the ledger record was found — by the image's own ID, or (ID missing/stripped/
+  // replaced) by comparing pixel content against every previously sealed image. null only for
+  // "unsigned" (no match at all).
+  matched_by?: "uid" | "content" | null;
   reason?: TamperedReason;
   changed_meta?: string[]; // tag names, only with reason === "metadata_changed"
   // Non-fatal: the device was revoked AFTER this seal was made, so it is still trusted.
-  warning?: "device_revoked_later";
+  warning?: "device_revoked_later" | "seal_id_missing";
   verify_ms?: number;
   preview_png: string;
   // null when the AI is off on the backend; the detective key only exists for unsigned images
