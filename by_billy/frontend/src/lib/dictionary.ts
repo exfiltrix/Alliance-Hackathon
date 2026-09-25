@@ -358,9 +358,9 @@ const dictionary = {
       en: "Upload a DICOM or PNG, choose a device — the image is sealed with SHA-256 and Ed25519.",
     },
     gatewayNote: {
-      uz: "Kasalxonada bu jarayon skaner yonidagi qurilmada avtomatik bajariladi.",
-      ru: "В больнице это происходит автоматически на устройстве рядом со сканером.",
-      en: "In a hospital this happens automatically on a box next to the scanner.",
+      uz: "Bu sahifa — shlyuz simulyatori. Haqiqiy tizimda muhrlash veb-forma orqali emas, skaner yonidagi qurilmada avtomatik bajariladi.",
+      ru: "Эта страница — симулятор шлюза. В реальной системе печать происходит не через веб-форму, а автоматически на устройстве рядом со сканером.",
+      en: "This page is a gateway simulator. In production, sealing happens automatically on a box next to the scanner — not through a web form.",
     },
     device: { uz: "Qurilma", ru: "Устройство", en: "Device" },
     addDevice: { uz: "+ Yangi qurilma", ru: "+ Новое устройство", en: "+ New device" },

@@ -37,6 +37,16 @@ there is no `device_id` field anymore (a client can no longer seal as an arbitra
 - The frontend never talks to this endpoint directly: `by_billy/frontend/src/app/api/seal/route.ts` is a Next.js
   route handler that adds the token server-side from `MEDSEAL_DEVICE_TOKEN` (see `by_billy/frontend/.env.example`).
 
+### Changed in audit remediation (P1-01): the gateway simulator requires Basic Auth
+`/seal` (the page) and `/api/seal`, `/api/crash-test`, `/api/passport` (the Next.js route handlers) require
+`Authorization: Basic <base64(user:password)>`, checked in `by_billy/frontend/src/proxy.ts` (first) and again inside
+each route handler (`by_billy/frontend/src/lib/gatewayAuth.ts`, defence in depth). Credentials come from server-only
+env vars `MEDSEAL_GATEWAY_USER` / `MEDSEAL_GATEWAY_PASSWORD` (see `by_billy/frontend/.env.example`) — unset means
+those routes refuse every request with `503` (fail closed, never open). Wrong credentials → `401` with
+`WWW-Authenticate: Basic realm="MedSeal gateway"`. `/api/seal` also rejects bodies over 50 MB with `413`, checked
+via the `Content-Length` header before the body is read. This protects the Next.js layer; `POST /seal` on the
+Python backend still separately requires the device bearer token (P0-1) regardless.
+
 `GET /seal/{id}/file` — sealed file to download: DICOM with patient tags removed (pixels unchanged) / PNG with `medseal_uid` chunk (pixels unchanged).
 **For the demo, verify the downloaded file** — a PNG that never went through `/seal` has no `medseal_uid` and is always `unsigned`.
 
