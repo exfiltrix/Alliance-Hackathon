@@ -17,11 +17,19 @@ Open `/crash-test` → before/after: healthy X-ray, AI says ~8% pneumonia → af
 Show the shield on `/verify`: "Yashirin hujum aniqlandi".
 
 ## 3b. Even we can't cheat (30 s)
-Before the demo: the original from step 1 is anchored (`POST /api/anchors/run`, or wait 10 min).
-Play the insider who has our database AND the device keys: `python -m scripts.rewrite_history_demo <seal_id> --image <fake>.png` — it re-signs the fake into the ledger and repairs the hash chain ("local ledger check: clean").
-Upload the fake to `/verify` again → **"Blockchain mismatch"** (without the chain it would now say "Tasdiqlangan"). Click the Etherscan link: the original fingerprint and time are on-chain.
+Before the demo (local chain, no internet needed):
+- terminal 1: `cd contracts && npx hardhat node` — keep it open until the demo is over (the chain lives in its memory);
+- terminal 2: `cd contracts && npm run deploy:local` (the address matches `backend/.env`), then start the backend;
+- seal the original (step 1), then anchor it: `curl -X POST -H "Authorization: Bearer <MEDSEAL_ADMIN_TOKEN>" http://localhost:8000/api/anchors/run`.
+
+On stage: play the insider who has our database AND the device keys:
+`cd backend && .venv/bin/python -m scripts.rewrite_history_demo <seal_id> --image <fake>.png` — it re-signs the fake into the ledger and repairs the hash chain ("local ledger check: clean").
+Upload the fake to `/verify` again → red **"Soxta muhr yozuvi"**: "the database no longer matches the blockchain record" (without the chain it would now say "Tasdiqlangan").
 Say: "Nobody can rewrite the history of seals — not a hacker, not a hospital, not us."
-Offline backup: the same with a local chain (`npx hardhat node`), just no Etherscan link.
+
+Pitfalls:
+- The script really rewrites that seal — use a fresh seal for every rehearsal.
+- If the hardhat node was restarted, everything anchored before is gone (older seals show "unavailable"): redeploy, seal a new image, anchor again.
 
 ## 4. Passport (20 s)
 Open the model's passport: robustness score, verdict, PDF.
