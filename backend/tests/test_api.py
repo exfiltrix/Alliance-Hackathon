@@ -1,3 +1,4 @@
+import pytest
 import base64
 import io
 
@@ -142,3 +143,16 @@ def test_stats(client, device):
     verify(client, xray_png(seed=9))
     s = client.get("/api/stats").json()
     assert (s["sealed"], s["verified"], s["authentic"], s["unsigned"], s["tampered"]) == (1, 2, 1, 1, 0)
+
+
+@pytest.mark.parametrize("origin,allowed", [
+    ("http://localhost:3000", True),
+    ("http://192.168.1.5:3000", True),
+    ("http://10.178.233.180:3000", True),
+    ("http://172.16.8.233:3000", True),
+    ("http://172.32.0.1:3000", False),  # not a private range
+    ("http://evil.com", False),
+])
+def test_cors_allows_frontend_on_any_private_ip(client, origin, allowed):
+    r = client.options("/api/verify", headers={"Origin": origin, "Access-Control-Request-Method": "POST"})
+    assert (r.headers.get("access-control-allow-origin") == origin) is allowed

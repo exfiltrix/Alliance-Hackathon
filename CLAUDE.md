@@ -78,6 +78,8 @@ cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python -m scripts.attack_demo ../data/samples/00000001_000.png --eps 2 --method pgd   # до/после в data/demo; eps 2 — щит ловит с запасом
 .venv/bin/python -m scripts.fetch_dataset          # NIH (data/nih) + Kermany (data/xray), нужен pyarrow
 .venv/bin/python -m scripts.calibrate_shield       # порог щита -> app/ai/shield_calibration.json (~5 мин)
+.venv/bin/python -m scripts.make_fakes             # демо-подделки для детектива -> data/demo/fakes (нужны веса детектива)
+.venv/bin/python -m scripts.tamper_demo ~/Downloads/x.png   # узел на ПОДПИСАННОМ PNG с сохранением medseal_uid -> x_tampered.png (шаг 2 демо)
 .venv/bin/pytest -m "not ai"                        # быстрые тесты без модели; ИИ-тесты сами пропускаются без весов/снимков
 # MEDSEAL_AI=0 выключает щит/детектива в /verify (в тестах выключены по умолчанию, ИИ-тесты включают сами)
 # скрипты запускать из backend/ через -m (им нужен пакет app)
@@ -85,6 +87,8 @@ cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # frontend (by_billy/frontend)
 cd by_billy/frontend && npm install && cp .env.example .env.local && npm run dev   # http://localhost:3000
 npm run build && npm run lint                       # проверка типов и линтер
+# доступ с других устройств в Wi-Fi: backend с --host 0.0.0.0, .env.local остаётся localhost:8000 —
+# api.ts сам подставляет хост, с которого открыт сайт; CORS пускает любые частные IP:3000; после смены сети перезапустить npm run dev
 
 # эталонный PoC (печатает сценарии 0/A/B/C и тайминги, сохраняет medseal_check.png)
 python reference/medseal_poc.py

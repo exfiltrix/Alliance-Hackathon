@@ -22,6 +22,11 @@ class Settings:
             "MEDSEAL_CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
         ).split(",")
     )
+    # Plus the frontend opened from any private-network address (phone on the same Wi-Fi), whatever the IP is.
+    cors_origin_regex: str = os.environ.get(
+        "MEDSEAL_CORS_ORIGIN_REGEX",
+        r"http://(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+):3000",
+    )
     max_upload_bytes: int = 50 * 1024 * 1024
     # Public/synthetic images (scripts/fetch_*.py). Crash test reads data/nih/normal, then data/samples.
     data_dir: Path = _path("MEDSEAL_DATA_DIR", BACKEND_DIR.parent / "data")

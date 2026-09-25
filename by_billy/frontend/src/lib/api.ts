@@ -13,7 +13,17 @@ import { mockApi } from "./mock";
 // Backend runs separately (no Docker). Leave NEXT_PUBLIC_API_URL unset to use mock data.
 const RAW_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
 export const USE_MOCK = !RAW_BASE;
-export const API_BASE_URL = RAW_BASE ?? "";
+
+// With NEXT_PUBLIC_API_URL=http://localhost:8000/api the site also works when opened from another
+// device (http://<laptop IP>:3000): the browser then talks to the backend on that same host.
+function resolveBase(raw: string | undefined): string {
+  if (!raw || typeof window === "undefined") return raw ?? "";
+  const url = new URL(raw);
+  if (["localhost", "127.0.0.1"].includes(url.hostname)) url.hostname = window.location.hostname;
+  return url.toString().replace(/\/$/, "");
+}
+
+export const API_BASE_URL = resolveBase(RAW_BASE);
 
 export class ApiError extends Error {
   status: number;
