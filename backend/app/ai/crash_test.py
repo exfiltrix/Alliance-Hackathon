@@ -27,10 +27,11 @@ def image_files() -> list[Path]:
     return [p for d in dirs if d.is_dir() for p in sorted(d.iterdir()) if p.suffix.lower() in IMAGE_SUFFIXES]
 
 
-def load_healthy(n: int, pathology: str) -> torch.Tensor:
-    """Up to n images the model scores below threshold for `pathology`, as a [k, 1, 224, 224] batch."""
+def load_healthy(n: int, pathology: str) -> tuple[torch.Tensor, list[str]]:
+    """Up to n images the model scores below threshold for `pathology`, as a [k, 1, 224, 224] batch,
+    plus the data folders they came from (e.g. ["nih/normal"])."""
     idx = model.pathology_index(pathology)
-    picked = []
+    picked, sources = [], set()
     for path in image_files():
         try:
             x = model.preprocess(load_image(path.read_bytes()).px)
@@ -39,11 +40,12 @@ def load_healthy(n: int, pathology: str) -> torch.Tensor:
         with torch.no_grad():
             if float(model.scores(x)[0, idx]) < model.THRESHOLD:
                 picked.append(x)
+                sources.add(path.parent.relative_to(settings.data_dir).as_posix())
         if len(picked) == n:
             break
     if not picked:
         raise CrashTestError(f"No test images found in {settings.data_dir}. Run: python -m scripts.fetch_dataset")
-    return torch.cat(picked)
+    return torch.cat(picked), sorted(sources)
 
 
 def _key(eps: float) -> str:
@@ -63,7 +65,7 @@ def run(
     attack = attacks.ATTACKS[method]
     kwargs = {"stop_when_flipped": True} if method == "pgd" else {}
 
-    x = load_healthy(n_images, pathology)
+    x, sources = load_healthy(n_images, pathology)
     progress(0.1)
 
     flip_rate, psnr = {}, {}
@@ -94,6 +96,7 @@ def run(
         "n_images": len(x),
         "method": method,
         "pathology": pathology,
+        "data": sources,
         "eps": eps_list,
         "flip_rate": flip_rate,
         "psnr": psnr,

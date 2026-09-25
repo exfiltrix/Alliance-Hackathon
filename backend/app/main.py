@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import db
 from app.config import settings
 from app.db import init_engine
-from app.routers import crash_test, devices, seal, stats, verify
+from app.routers import crash_test, devices, passport, seal, stats, verify
 
 
 @asynccontextmanager
@@ -26,7 +26,7 @@ app.add_middleware(
     expose_headers=["Content-Disposition"],
 )
 
-for r in (devices.router, seal.router, verify.router, crash_test.router, stats.router):
+for r in (devices.router, seal.router, verify.router, crash_test.router, passport.router, stats.router):
     app.include_router(r, prefix="/api")
 
 

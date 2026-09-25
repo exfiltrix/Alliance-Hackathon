@@ -26,7 +26,7 @@ def run_shield(px: np.ndarray) -> dict | None:
         from app.ai import shield
     except ImportError:
         return None
-    if not shield.CALIBRATION.exists():
+    if not settings.shield_calibration.exists():
         log.warning("shield is not calibrated: run python -m scripts.calibrate_shield")
         return None
     try:

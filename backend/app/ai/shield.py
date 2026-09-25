@@ -13,15 +13,13 @@ The threshold is the 99th percentile of the score on clean X-rays
 """
 import json
 from functools import lru_cache
-from pathlib import Path
 
 import numpy as np
 import torch
 from PIL import Image, ImageFilter
 
 from app.ai import model
-
-CALIBRATION = Path(__file__).with_name("shield_calibration.json")
+from app.config import settings
 
 
 def squeeze(img: np.ndarray) -> np.ndarray:
@@ -44,7 +42,7 @@ def model_input(px: np.ndarray) -> np.ndarray:
 
 @lru_cache(maxsize=1)
 def calibration() -> dict:
-    return json.loads(CALIBRATION.read_text())
+    return json.loads(settings.shield_calibration.read_text())
 
 
 def check(px: np.ndarray) -> dict:

@@ -69,7 +69,9 @@ Output: one score per pathology in `model.pathologies` (use "Pneumonia" for the 
 | verifications | id, uid, result (authentic/tampered/unsigned/forged), changed_tiles_json, detective_prob, shield_flag, created_at |
 | models | id, name, version, source, intended_use |
 | crash_tests | id, model_id, n_images, results_json, robustness_score, created_at |
-| passports | id, model_id, crash_test_id, verdict, conditions, created_at |
+| passports | id, model_id, crash_test_id, verdict, conditions (JSON codes), organisation, report_json (frozen snapshot), created_at |
+
+New columns on existing tables are added on startup by `db._add_missing_columns` (no Alembic).
 
 ## 4. Performance targets
 Seal/verify < 50 ms per image; shield < 1 s; crash test 50 images < 2 min on CPU.

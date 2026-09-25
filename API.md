@@ -68,7 +68,7 @@ Device: `{id, name, hospital, public_key_hex, revoked, created_at}`
 when done:
 ```json
 { "job_id": 3, "model_id": 1, "created_at": "…", "status": "done", "progress": 1.0,
-  "n_images": 50, "method": "pgd", "pathology": "Pneumonia",
+  "n_images": 50, "method": "pgd", "pathology": "Pneumonia", "data": ["nih/normal"],
   "eps": [0.5, 1, 2, 4],
   "flip_rate": {"0.5": 0.32, "1": 0.98, "2": 1.0, "4": 1.0},
   "psnr": {"0.5": 54.7, "1": 50.0, "2": 47.9, "4": 45.0},
@@ -78,14 +78,43 @@ when done:
 ```
 - `eps` always contains `1` (added if missing): the score is `round(10 × (1 − flip_rate["1"]), 1)`.
 - `flip_rate` / `psnr` keys are eps formatted without trailing zeros (`"0.5"`, `"1"`, `"2"`). PSNR in dB: > 40 means the noise is invisible to the eye.
-- Images are adult chest X-rays (NIH) the model reads as healthy; a "flip" = the attack pushed the Pneumonia score above 0.5.
+- Images are adult chest X-rays (NIH) the model reads as healthy; `data` lists the folders they came from (`nih/normal`, or `samples` when the dataset is not downloaded); a "flip" = the attack pushed the Pneumonia score above 0.5.
 - A job interrupted by a server restart returns `status: "error"`.
 
 `GET /crash-tests?model_id=1` → finished tests, newest first, same fields as "done" but without `example`.
 
 ## Passport
-`POST /passport` — `{model_id, crash_test_id}` → passport JSON
-`GET /passport/{id}` → passport JSON · `GET /passport/{id}/pdf` → PDF
+`POST /passport` — `{model_id, crash_test_id?, organisation?}` → `201` passport JSON
+- `crash_test_id` defaults to the model's latest finished crash test. `organisation` = responsible organisation (free text, may be empty).
+- Errors: 404 unknown model / crash test of another model, 409 no finished crash test yet.
+- A passport is frozen at issue time: later seals, verifications or crash tests do not change it. Issue a new one to refresh.
+
+`GET /passport/{id}` → passport JSON · `GET /passports?model_id=1` → summaries `[{id, created_at, organisation, verdict, conditions, model, robustness_score}]`, newest first
+`GET /passport/{id}/pdf?lang=uz|ru` → one-page A4 PDF (download; `Content-Disposition: attachment`). Default `uz`.
+
+```json
+{ "id": 1, "created_at": "2026-09-25T06:33:20Z", "organisation": "Namangan viloyat shifoxonasi",
+  "model": { "id": 1, "name": "torchxrayvision DenseNet121", "version": "densenet121-res224-all", "source": "https://…", "intended_use": "…" },
+  "robustness": { "score": 0.2, "formula": "10 × (1 − flip rate at eps = 1 px)", "crash_test_id": 1, "tested_at": "…",
+                  "n_images": 50, "method": "pgd", "pathology": "Pneumonia", "data": ["nih/normal"],
+                  "flip_rate": {"0.5": 0.32, "1": 0.98, "2": 1.0, "4": 1.0}, "psnr": {"0.5": 54.7, "1": 50.0, "2": 47.9, "4": 45.0},
+                  "example": { "eps": 1, "before_png": "base64…", "after_png": "base64…", "before_score": 0.07, "after_score": 0.78 } },
+  "shield": { "available": true, "compatible": true, "method": "median 3x3, L1 distance of DenseNet logits", "threshold": 10.419,
+              "false_positive_rate": 0.009, "detection_pgd_eps1": 1.0, "detection_fgsm_eps1": 0.619, "calibrated_on": "NIH ChestX-ray14 …" },
+  "pipeline": { "devices_active": 1, "seals": 12, "verifications": 30, "tampered_or_forged": 4, "ledger_ok": true },
+  "verdict": "allowed_with_conditions",
+  "conditions": ["shield_required", "seal_required", "doctor_decides"],
+  "rules": { "allow_score": 7.0, "shield_min_detection": 0.9, "shield_max_false_alarms": 0.02 },
+  "note": "Final decision is made by the doctor." }
+```
+- `verdict`: `allowed` (score ≥ 7) · `allowed_with_conditions` (score < 7, shield compatible) · `not_allowed` (score < 7, no compatible shield). Show the rule under the verdict — it is built from `rules`.
+- `shield.compatible` = catches ≥ 90% PGD attacks at eps 1 px with ≤ 2% false alarms. If the shield is not calibrated: `{"available": false, "compatible": false}` only.
+- `conditions` are codes; texts go in the frontend dictionary (the PDF has the same texts in `backend/app/passport/i18n.py`):
+  - `shield_required` — every image passes the MedSeal shield before the model
+  - `seal_required` — images sealed at capture and verified before the model
+  - `doctor_decides` — the model only advises; the doctor makes the diagnosis
+  - `retest_required` — retrain the model against attacks and re-run the crash test
+- `robustness.example` may be `null` (older crash tests).
 
 ## Stats
 `GET /stats` → `{sealed, verified, authentic, tampered, unsigned, forged, models_tested, avg_robustness}` (`avg_robustness` is `null` until a crash test has run)

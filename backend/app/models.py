@@ -83,11 +83,15 @@ class CrashTest(Base):
 
 
 class Passport(Base):
+    """Issued once and frozen: report_json is a snapshot of every number at issue time."""
+
     __tablename__ = "passports"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     model_id: Mapped[int] = mapped_column(ForeignKey("models.id"))
     crash_test_id: Mapped[int] = mapped_column(ForeignKey("crash_tests.id"))
     verdict: Mapped[str] = mapped_column(String(32))
-    conditions: Mapped[str] = mapped_column(Text, default="")
+    conditions: Mapped[str] = mapped_column(Text, default="")  # JSON list of condition codes
+    organisation: Mapped[str] = mapped_column(String(300), default="")
+    report_json: Mapped[str] = mapped_column(Text, default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

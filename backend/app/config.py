@@ -27,6 +27,8 @@ class Settings:
     data_dir: Path = _path("MEDSEAL_DATA_DIR", BACKEND_DIR.parent / "data")
     # Run the AI shield/detective inside /verify (needs torch + weights). MEDSEAL_AI=0 turns them off.
     ai_enabled: bool = os.environ.get("MEDSEAL_AI", "1") != "0"
+    # Shield threshold + measured quality (scripts/calibrate_shield.py). Committed; the passport reads it too.
+    shield_calibration: Path = BACKEND_DIR / "app" / "ai" / "shield_calibration.json"
 
 
 settings = Settings()

@@ -61,11 +61,11 @@ def main():
             with torch.no_grad():
                 s = model.scores(torch.cat([model.preprocess(a) for a in adv]))[:, idx]
             fooled = [a for a, v in zip(adv, s) if v > model.THRESHOLD]
-            rate = float((batched_distances(fooled) > threshold).mean()) if fooled else None
+            rate = round(float((batched_distances(fooled) > threshold).mean()), 3) if fooled else None
             detection[method][f"{eps:g}"] = {"attacks_that_fooled_model": len(fooled), "detected": rate}
             print(f"{method} eps={eps:g}: fooled {len(fooled)}/{len(x)}, detected {rate if rate is None else f'{rate:.0%}'}")
 
-    shield.CALIBRATION.write_text(json.dumps({
+    settings.shield_calibration.write_text(json.dumps({
         "method": "median 3x3, L1 distance of DenseNet logits",
         "threshold": threshold,
         "percentile": PERCENTILE,
@@ -76,7 +76,7 @@ def main():
         "detection_rate": detection,
         "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }, indent=2) + "\n")
-    print("saved", shield.CALIBRATION)
+    print("saved", settings.shield_calibration)
 
 
 if __name__ == "__main__":
