@@ -1,6 +1,6 @@
 // Demo data used when NEXT_PUBLIC_API_URL is not set. Mirrors the real API shapes.
 import type { Api } from "./api";
-import type { AiModel, CrashTestJob, Passport, VerifyResponse } from "./types";
+import type { AiModel, CrashTestJob, InboxItem, Passport, VerifyResponse } from "./types";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -19,7 +19,26 @@ const jobs = new Map<number, { started: number; modelId: number; n: number; meth
 const passports = new Map<number, Passport>();
 let nextId = 100;
 
-const FLIP = { "0.5": 0.12, "1": 0.98, "2": 1, "4": 1 };
+const inbox: InboxItem[] = [];
+const inboxResults = new Map<number, VerifyResponse>();
+
+function mockInboxItem(fileName: string, r: VerifyResponse): InboxItem {
+  const id = nextId++;
+  inboxResults.set(id, r);
+  const danger = r.status === "tampered" || r.status === "forged" || !!r.shield?.attack_suspected;
+  const reasons: InboxItem["reasons"] = [];
+  if (r.status === "tampered" || r.status === "forged") reasons.push(r.status);
+  if (r.shield?.attack_suspected) reasons.push("attack_suspected");
+  if (!danger && r.status === "unsigned") reasons.push("unsigned");
+  return {
+    id, file_name: fileName, source: "upload", received_at: new Date().toISOString(), status: r.status,
+    severity: danger ? "danger" : r.status === "unsigned" ? "warning" : "ok", reasons, reviewed: false,
+    device: r.device ?? null, changed_tiles: r.changed_tiles.length,
+    detective_probability: r.detective?.probability ?? null, error: null,
+  };
+}
+
+const FLIP = { "0.5": 0.12, "1": 0.48, "2": 0.9, "4": 1 };
 const PSNR = { "0.5": 58.3, "1": 52.1, "2": 46.2, "4": 40.1 };
 
 function mockPassport(id: number, model: AiModel, crashTestId: number): Passport {
@@ -140,6 +159,7 @@ export const mockApi: Api = {
       root: Array.from({ length: 64 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join(""),
       created_at: new Date().toISOString(),
       download_url: URL.createObjectURL(file),
+      check_token: `demo${id}`,
     };
   },
 
@@ -255,6 +275,60 @@ export const mockApi: Api = {
     return passports.get(id) ?? mockPassport(id, models[0], 1);
   },
   passportPdfUrl: () => "",
+
+  async uploadToInbox(files) {
+    await wait(700);
+    const added = await Promise.all(files.map((f) => mockApi.verify(f).then((r) => mockInboxItem(f.name, r))));
+    inbox.unshift(...added);
+    return added;
+  },
+  async getInbox() {
+    await wait(200);
+    const rank = { danger: 0, warning: 1, ok: 2 } as const;
+    const items = [...inbox].sort((a, b) => Number(a.reviewed) - Number(b.reviewed) || rank[a.severity] - rank[b.severity] || b.id - a.id);
+    const open = inbox.filter((i) => !i.reviewed);
+    return {
+      counts: {
+        danger: open.filter((i) => i.severity === "danger").length,
+        warning: open.filter((i) => i.severity === "warning").length,
+        ok: open.filter((i) => i.severity === "ok").length,
+        total: inbox.length,
+      },
+      items,
+    };
+  },
+  async getInboxItem(id) {
+    await wait(150);
+    const item = inbox.find((i) => i.id === id);
+    if (!item) throw new Error("Inbox item not found");
+    return { ...item, result: inboxResults.get(id)! };
+  },
+  async reviewInboxItem(id) {
+    const item = inbox.find((i) => i.id === id)!;
+    item.reviewed = true;
+    return item;
+  },
+  async getAutomation() {
+    return {
+      watching: false, scanner_dir: "data/watch/scanner", incoming_dir: "data/watch/incoming", interval_s: 2,
+      gateway: "Shlyuz-Auto", sealed: 0, verified: inbox.length, failed: 0, last_event: null, warmup: false,
+    };
+  },
+  async runAutomation() {
+    return { sealed: 0, verified: 0 };
+  },
+  async getCheck() {
+    await wait(300);
+    return {
+      status: "valid", reason: null, hospital: "Namangan viloyat shifoxonasi", device: "KT-01",
+      sealed_at: new Date().toISOString(), shape: [512, 512],
+    };
+  },
+  async checkFile(_token, file) {
+    const r = await mockApi.verify(file);
+    return { status: r.status, changed_tiles: r.changed_tiles.length, preview_png: r.preview_png };
+  },
+  checkQrUrl: () => "",
 
   async getStats() {
     await wait(250);

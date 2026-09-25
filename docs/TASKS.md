@@ -10,20 +10,22 @@ Rule: at the end of every day the demo must run end-to-end, even if parts are st
 5. **Pitch** — slides, script, backup video, jury Q&A.
 
 ## Day 1 — skeleton that works
-- [ ] (1) FastAPI app, SQLite tables, `/devices`, `/seal`, `/verify` ported from `reference/medseal_poc.py`
-- [ ] (1) pytest: round-trip, 1-pixel change, forged ledger rejected
-- [ ] (2) load torchxrayvision, `predict()` returns pathology scores for a PNG/DICOM
-- [ ] (2) FGSM on one image flips "Pneumonia" — save before/after PNG
-- [ ] (3) Next.js app, pages `/seal` and `/verify` calling the API, red-box preview
-- [ ] (4) download public chest X-rays; pick 10 demo images; make 3 convincing fakes
+- [x] (1) FastAPI app, SQLite tables, `/devices`, `/seal`, `/verify` ported from `reference/medseal_poc.py`
+- [x] (1) pytest: round-trip, 1-pixel change, forged ledger rejected
+- [x] (2) load torchxrayvision, `predict()` returns pathology scores for a PNG/DICOM
+- [x] (2) FGSM on one image flips "Pneumonia" — save before/after PNG
+- [x] (3) Next.js app, pages `/seal` and `/verify` calling the API, red-box preview
+- [x] (4) download public chest X-rays; pick 10 demo images; make 3 convincing fakes
 - [ ] (5) pitch outline: patient story → threat → demo → standard → business
 
 ## Day 2 — all features
-- [ ] (1) PNG `medseal_uid` chunk, hash-chain ledger, `/stats`
-- [ ] (2) crash test job over 50 images, flip rate per eps, robustness score
-- [ ] (2) shield: calibrate threshold on clean images, flag attacked ones
-- [ ] (2) detective: `scripts/make_fakes.py`, train ResNet18, Grad-CAM (keep a fallback: if accuracy is poor, show it as "experimental")
-- [ ] (3) pages `/crash-test`, `/passport/[id]`, PDF export, `/dashboard`
+- [ ] (1) deploy `MedSealAnchor` on Sepolia (Remix), verify source on Etherscan — contract, tests and deploy script done; runs on a local chain (`./demo.sh`), Sepolia needs a funded wallet
+- [x] (1) anchoring service + Merkle proofs + `blockchain` field in verify; test: DB edit → mismatch
+- [x] (1) PNG `medseal_uid` chunk, hash-chain ledger, `/stats`
+- [x] (2) crash test job over 50 images, flip rate per eps, robustness score
+- [x] (2) shield: calibrate threshold on clean images, flag attacked ones
+- [x] (2) detective: `scripts/make_fakes.py`, train ResNet18, Grad-CAM (keep a fallback: if accuracy is poor, show it as "experimental")
+- [x] (3) pages `/crash-test`, `/passport/[id]`, PDF export, `/dashboard`
 - [ ] (4) UI polish, icons, colors (green/red/grey states)
 - [ ] (5) slides draft, rehearsal #1
 
@@ -34,6 +36,8 @@ Rule: at the end of every day the demo must run end-to-end, even if parts are st
 - [ ] (5) record backup video of the full demo; final slides; Q&A practice
 
 ## Useful prompts for Claude Code
+- "Implement blockchain anchoring per `docs/BLOCKCHAIN.md`: contract in `contracts/`, service in `backend/app/anchor/`, proofs stored per seal, and the `blockchain` field in `/api/verify`."
+- "Go through `docs/SECURITY.md` and add a pytest for every threat marked ✅."
 - "Port `reference/medseal_poc.py` into `backend/app/seal/` as a module with functions `seal_image`, `verify_image`; add pytest tests for the three scenarios in the reference."
 - "Implement `POST /api/verify` per `docs/API.md`, returning a PNG preview with red rectangles on changed tiles."
 - "Implement targeted FGSM and PGD in `backend/app/ai/attacks.py` for the torchxrayvision DenseNet, target class 'Pneumonia', eps given in 0–255 pixel units."

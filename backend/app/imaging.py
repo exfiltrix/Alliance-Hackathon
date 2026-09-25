@@ -56,6 +56,10 @@ class ImageError(ValueError):
     """Upload is not a supported image. Message is safe to show to the user."""
 
 
+class ImageTooLarge(ImageError):
+    """Decodes to more pixels than settings.max_pixels (decompression bomb, T10)."""
+
+
 @dataclass
 class LoadedImage:
     kind: Literal["dicom", "png"]
@@ -75,7 +79,7 @@ def _pixel_budget() -> int:
 
 def _check_pixel_count(count: int) -> None:
     if count > _pixel_budget():
-        raise ImageError(f"Image is too large: {count} pixels exceed the {_pixel_budget()} pixel limit")
+        raise ImageTooLarge(f"Image is too large: {count} pixels exceed the {_pixel_budget()} pixel limit")
 
 
 def _check_png_header(data: bytes) -> None:

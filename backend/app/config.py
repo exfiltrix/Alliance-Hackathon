@@ -3,7 +3,13 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 BACKEND_DIR = Path(__file__).resolve().parent.parent
+
+# Secrets (admin token, anchoring key, RPC URL) live only in backend/.env (gitignored) or the real
+# environment; variables already set in the environment win over the file.
+load_dotenv(BACKEND_DIR / ".env", override=False)
 
 
 def _path(env: str, default: Path) -> Path:
@@ -28,15 +34,18 @@ class Settings:
         r"http://(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+):3000",
     )
     max_upload_bytes: int = 50 * 1024 * 1024
-    # Hard pixel budget checked from image headers before decoding pixels.
-    max_pixels: int = int(os.environ.get("MEDSEAL_MAX_PIXELS", "40000000"))
+    # Decoded size cap (T10): a 50 MB PNG/DICOM can still decode into gigabytes ("decompression bomb").
+    # Checked from the header, before any pixel is decoded. 64 Mpx = 8000x8000, far above any X-ray/CT.
+    max_pixels: int = int(os.environ.get("MEDSEAL_MAX_PIXELS", str(64_000_000)))
+    # POST requests per client IP per minute (T11); 0 = off. Uploads are the expensive part of the API.
+    rate_limit_per_min: int = int(os.environ.get("MEDSEAL_RATE_LIMIT", "120"))
     # Public/synthetic images (scripts/fetch_*.py). Crash test reads data/nih/normal, then data/samples.
     data_dir: Path = _path("MEDSEAL_DATA_DIR", BACKEND_DIR.parent / "data")
     # Run the AI shield/detective inside /verify (needs torch + weights). MEDSEAL_AI=0 turns them off.
     ai_enabled: bool = os.environ.get("MEDSEAL_AI", "1") != "0"
     # Required to create/revoke devices (POST /devices, /devices/{id}/revoke). No default: unset means
     # those endpoints refuse every request, rather than silently accepting an empty bearer token.
-    admin_token: str = os.environ.get("MEDSEAL_ADMIN_TOKEN", "")
+    admin_token: str = field(default=os.environ.get("MEDSEAL_ADMIN_TOKEN", ""), repr=False)
     # Optional HMAC salt used to bind a DICOM PatientID without storing it. Keep it stable.
     patient_salt: str = os.environ.get("MEDSEAL_PATIENT_SALT", "")
     # Root signing material. The private key stays in the gateway/HSM; verifiers use root.pub only.
@@ -50,6 +59,24 @@ class Settings:
     # Detective weights (scripts/train_detective.py) and their held-out quality.
     detective_weights: Path = _path("MEDSEAL_DETECTIVE_WEIGHTS", BACKEND_DIR / "weights" / "detective.pt")
     detective_metrics: Path = BACKEND_DIR / "app" / "ai" / "detective_metrics.json"
+    # Automation (app/automation/watcher.py): watched folders, sealing gateway, model warm-up.
+    watch_enabled: bool = os.environ.get("MEDSEAL_WATCH", "1") != "0"
+    watch_dir: Path = _path("MEDSEAL_WATCH_DIR", BACKEND_DIR.parent / "data" / "watch")
+    watch_interval_s: float = float(os.environ.get("MEDSEAL_WATCH_INTERVAL", "2"))
+    gateway_name: str = os.environ.get("MEDSEAL_GATEWAY_NAME", "Shlyuz-Auto")
+    gateway_hospital: str = os.environ.get("MEDSEAL_GATEWAY_HOSPITAL", "Namangan viloyat shifoxonasi")
+    warmup: bool = os.environ.get("MEDSEAL_WARMUP", "1") != "0"
+    # Blockchain anchoring (docs/BLOCKCHAIN.md). Names as in the doc, no MEDSEAL_ prefix. Anchoring is
+    # on only when RPC_URL, CONTRACT_ADDRESS and ANCHOR_PRIVATE_KEY are all set; otherwise /verify
+    # returns "blockchain": null. The key is never logged or returned (repr=False keeps it out of reprs).
+    rpc_url: str = field(default=os.environ.get("RPC_URL", ""), repr=False)  # may embed a provider API key
+    anchor_private_key: str = field(default=os.environ.get("ANCHOR_PRIVATE_KEY", ""), repr=False)
+    contract_address: str = os.environ.get("CONTRACT_ADDRESS", "")
+    chain_id: int = int(os.environ.get("CHAIN_ID") or 0)
+    explorer_url: str = os.environ.get("EXPLORER_URL", "").rstrip("/")  # e.g. https://sepolia.etherscan.io
+    anchor_enabled: bool = os.environ.get("MEDSEAL_ANCHOR", "1") != "0"  # background batching loop
+    anchor_interval_s: float = float(os.environ.get("MEDSEAL_ANCHOR_INTERVAL", "600"))
+    anchor_confirmations: int = int(os.environ.get("MEDSEAL_ANCHOR_CONFIRMATIONS", "1"))
 
 
 settings = Settings()

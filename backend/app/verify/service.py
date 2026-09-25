@@ -3,13 +3,22 @@
 The native array is used for the frozen tile/Merkle checks. Only the display view is
 passed to previews and AI, so DICOM LUT/windowing changes are metadata changes rather
 than accidental pixel-hash changes.
+
+Status order matters: unsigned (no record) -> forged (record not authentic) ->
+tampered (tile mismatch) -> authentic. Changed tiles are only meaningful when
+the record itself is authentic.
+
+The blockchain check (app.anchor) runs for every sealed image. A mismatch means our own
+database was rewritten, so it overrides a locally clean result: forged / blockchain_mismatch.
 """
 import json
 import time
 
 from sqlalchemy.orm import Session
 
+from app import audit
 from app.ai import hooks
+from app.anchor import service as anchoring
 from app.config import settings
 from app.imaging import (
     LoadedImage,
@@ -27,7 +36,12 @@ DOCTOR_NOTE = "Final decision is made by the doctor."
 
 
 def _check_row(session: Session, row) -> tuple[Device | None, str | None, str | None]:
-    """Return (device, fatal reason, non-fatal warning)."""
+    """Return (device, fatal reason, non-fatal warning).
+
+    Revocation is not retroactive: a seal made BEFORE revoked_at is trusted as usual (the
+    device's key was presumably fine back then) but carries a warning, since we can no longer
+    vouch for the device going forward. Only seals made at/after revoked_at are forged outright.
+    """
     device = session.get(Device, row.device_id)
     if device is None:
         return None, "unknown_device", None
@@ -93,7 +107,7 @@ def _patient_check(image: LoadedImage, row) -> tuple[str, str | None]:
     return "mismatch", "patient_mismatch"
 
 
-def verify_upload(session: Session, image: LoadedImage) -> dict:
+def verify_upload(session: Session, image: LoadedImage, actor: str = "anonymous", ip: str | None = None) -> dict:
     t0 = time.perf_counter()
     row = ledger.find_by_uid(session, image.uid) if image.uid else None
     matched_by: str | None = "uid" if row is not None else None
@@ -114,13 +128,17 @@ def verify_upload(session: Session, image: LoadedImage) -> dict:
         "tile": None,
         "matched_by": matched_by,
         "patient_check": "not_available",
+        "blockchain": None,
     }
 
     if row is None:
         result["status"] = "unsigned"
     else:
         device, reason, warning = _check_row(session, row)
-        result.update(device=device.name if device else None, seal_id=row.id, tile=row.tile)
+        blockchain = anchoring.check(session, row)
+        if reason is None and (blockchain or {}).get("status") == "mismatch":
+            reason = "blockchain_mismatch"
+        result.update(device=device.name if device else None, seal_id=row.id, tile=row.tile, blockchain=blockchain)
         patient_check, patient_reason = _patient_check(image, row)
         result["patient_check"] = patient_check
         if reason:
@@ -143,6 +161,7 @@ def verify_upload(session: Session, image: LoadedImage) -> dict:
             result.update(
                 status="tampered" if (changed or meta_changed) else "authentic",
                 changed_tiles=[list(k) for k in changed],
+                sealed_at=iso_utc(row.created_at),  # T6: a replayed old image shows its original date
             )
             if meta_changed:
                 result.update(reason="metadata_changed", changed_meta=changed_meta)
@@ -175,5 +194,8 @@ def verify_upload(session: Session, image: LoadedImage) -> dict:
             shield_flag=(result["shield"] or {}).get("attack_suspected"),
         )
     )
+    outcome = result["status"] + (f":{result['reason']}" if result.get("reason") else "")
+    audit.log(session, "verify", actor, target=f"seal:{row.id}" if row else f"uid:{image.uid or '-'}",
+              result=outcome, ip=ip)
     session.commit()
     return result

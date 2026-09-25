@@ -1,4 +1,4 @@
-// Shapes mirror /API.md in the repo root (the backend contract) — keep both in sync.
+// Shapes mirror docs/API.md in the repo root (the backend contract) — keep both in sync.
 
 export type Device = {
   id: number;
@@ -15,13 +15,74 @@ export type SealResponse = {
   root: string;
   created_at: string;
   download_url: string;
+  check_token?: string; // patient QR check: /check/{check_token}
+};
+
+export type Severity = "danger" | "warning" | "ok";
+
+export type InboxReason =
+  | "tampered" | "forged" | "attack_suspected" | "unsigned" | "unreadable" | "device_revoked_later";
+
+export type InboxItem = {
+  id: number;
+  file_name: string;
+  source: "upload" | "folder";
+  received_at: string;
+  status: VerifyStatus | "error";
+  severity: Severity;
+  reasons: InboxReason[];
+  reviewed: boolean;
+  device: string | null;
+  changed_tiles: number;
+  detective_probability: number | null;
+  error: string | null;
+};
+
+export type InboxListing = {
+  counts: Record<Severity, number> & { total: number };
+  items: InboxItem[];
+};
+
+export type AutomationStatus = {
+  watching: boolean;
+  scanner_dir: string;
+  incoming_dir: string;
+  interval_s: number;
+  gateway: string;
+  sealed: number;
+  verified: number;
+  failed: number;
+  last_event: { at: string; text: string } | null;
+  warmup: boolean;
+};
+
+export type CheckInfo = {
+  status: "valid" | "warning" | "invalid";
+  reason: string | null;
+  hospital: string | null;
+  device: string | null;
+  sealed_at: string;
+  shape: number[];
+};
+
+export type CheckFileResult = {
+  status: VerifyStatus | "mismatch";
+  reason?: string | null;
+  changed_tiles?: number;
+  preview_png?: string;
 };
 
 export type VerifyStatus = "authentic" | "tampered" | "unsigned" | "forged";
 
 // CRY-02: the device has no valid root-signed certificate (a forged device row, or a swapped
 // public key) — checked before the hash chain, so it wins over ledger_entry_modified.
-export type ForgedReason = "ledger_entry_modified" | "bad_signature" | "device_revoked" | "unknown_device" | "untrusted_device";
+export type ForgedReason =
+  | "ledger_entry_modified"
+  | "bad_signature"
+  | "device_revoked"
+  | "unknown_device"
+  | "untrusted_device"
+  | "blockchain_mismatch"; // our database no longer matches the root anchored on-chain
 // P0-5: appears on `tampered` too, when display metadata (RescaleIntercept, Laterality...)
 // was edited without touching pixels. P1-03: appears when the seal was found by content, not
 // by ID, and something about the matched image differs. CRY-01: patient_mismatch means every
@@ -51,12 +112,25 @@ export type VerifyResponse = {
   // de-identification cannot remove.
   phi_warning?: "burned_in_annotation";
   verify_ms?: number;
+  sealed_at?: string; // on authentic/tampered: when and (device) by whom the image was sealed
+  // null when anchoring is off on the backend or the image is unsigned. See API.md.
+  blockchain?: BlockchainCheck | null;
   preview_png: string;
   // null when the AI is off on the backend; the public API intentionally omits Grad-CAM output.
   detective?: { probability: number; experimental: boolean } | null;
   shield: { attack_suspected: boolean; score: number; threshold: number } | null;
   ai_note?: "not_applicable";
   note: string;
+};
+
+export type BlockchainCheck = {
+  status: "anchored" | "pending" | "mismatch" | "unavailable";
+  detail?: "proof_missing" | "anchor_record_missing";
+  block?: number;
+  time?: string; // on-chain block time of the batch
+  tx_hash?: string;
+  tx_url?: string | null; // block explorer link; null on a local chain
+  chain_id?: number;
 };
 
 export type AiModel = {

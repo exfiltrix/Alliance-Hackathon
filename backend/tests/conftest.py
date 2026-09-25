@@ -25,6 +25,14 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "require_device_cert", True)
     monkeypatch.setattr(settings, "ai_enabled", False)  # AI tests switch it on themselves
     monkeypatch.setattr(settings, "admin_token", ADMIN_TOKEN)
+    monkeypatch.setattr(settings, "watch_enabled", False)  # tests call watcher.run_once() themselves
+    monkeypatch.setattr(settings, "watch_dir", tmp_path / "watch")
+    monkeypatch.setattr(settings, "warmup", False)
+    # Never touch a real chain from tests, even if backend/.env configures one.
+    for name in ("rpc_url", "contract_address", "anchor_private_key"):
+        monkeypatch.setattr(settings, name, "")
+    monkeypatch.setattr(settings, "anchor_enabled", False)  # tests call anchoring.run_batch() themselves
+    monkeypatch.setattr(settings, "rate_limit_per_min", 0)  # test_threats switches it on itself
     from app.main import app
 
     with TestClient(app) as c:
@@ -33,6 +41,17 @@ def client(tmp_path, monkeypatch):
 
 def admin_headers():
     return {"Authorization": f"Bearer {ADMIN_TOKEN}"}
+
+
+@pytest.fixture
+def chain(client):
+    """In-memory MedSealAnchor contract, used by /verify and the anchoring service for this test."""
+    from app.anchor.chain import MemoryChain, set_chain
+
+    c = MemoryChain()
+    set_chain(c)
+    yield c
+    set_chain(None)
 
 
 @pytest.fixture

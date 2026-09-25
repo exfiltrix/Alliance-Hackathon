@@ -6,9 +6,10 @@ import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
 import LanguageSwitch from "./LanguageSwitch";
 import AccessibilityPanel from "./AccessibilityPanel";
-import { ChartIcon, CrashTestIcon, SealIcon, VerifyIcon } from "./icons";
+import { ChartIcon, CrashTestIcon, InboxIcon, SealIcon, VerifyIcon } from "./icons";
 
 const LINKS = [
+  { href: "/inbox", key: "inbox", icon: InboxIcon },
   { href: "/seal", key: "seal", icon: SealIcon },
   { href: "/verify", key: "verify", icon: VerifyIcon },
   { href: "/crash-test", key: "crashTest", icon: CrashTestIcon, match: ["/crash-test", "/passport"] },

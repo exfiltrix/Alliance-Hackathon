@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Runs before every commit (enable once per clone: git config core.hooksPath .githooks).
+# 1) blocks secrets, 2) runs the tests of the parts you changed. Emergency skip: git commit --no-verify
+set -uo pipefail
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+[ -z "$staged" ] && exit 0
+fail() { echo -e "\n\033[31m✗ $1\033[0m\n  (skip in an emergency: git commit --no-verify)"; exit 1; }
+ok() { echo -e "\033[32m✓ $1\033[0m"; }
+
+# --- secrets: only ever in .env (gitignored) ---
+if echo "$staged" | grep -E '(^|/)\.env(\.local)?$|(^|/)keys/|\.pem$' >/dev/null; then
+  fail "secret file staged: $(echo "$staged" | grep -E '(^|/)\.env(\.local)?$|(^|/)keys/|\.pem$' | head -3 | tr '\n' ' ')"
+fi
+# Real-looking values only: a 64-hex private key, or a long random token (placeholders like
+# "change-me" / "dev-admin-token" in docs are fine).
+if git diff --cached -U0 -- . ':(exclude)*.example' ':(exclude)package-lock.json' \
+   | grep -E '^\+.*(BEGIN [A-Z ]*PRIVATE KEY|0x[0-9a-fA-F]{64}([^0-9a-fA-F]|$)|(MEDSEAL_ADMIN_TOKEN|MEDSEAL_DEVICE_TOKEN)=[A-Za-z0-9_-]{20,})' >/dev/null; then
+  fail "something that looks like a private key (0x + 64 hex) or a real token is staged — secrets go in .env only"
+fi
+ok "no secrets"
+
+# --- data and junk: X-rays, DICOM, databases, model weights, archives, PDFs never go to the repo ---
+# (website images live in by_billy/frontend/public/ and are allowed)
+added=$(git diff --cached --name-only --diff-filter=A)
+junk=$(echo "$added" | grep -E -i '\.(png|jpe?g|dcm|dicom|nii|db|sqlite3?|pt|pth|onnx|npy|npz|zip|tar|gz|7z|pdf|pptx?|docx?|log)$|(^|/)(data|storage|weights|node_modules|\.next|__pycache__)/|\.DS_Store$' \
+  | grep -v -E '^by_billy/frontend/(public|src/app)/' || true)
+[ -n "$junk" ] && fail "data or junk files staged (not part of the project): $(echo "$junk" | head -5 | tr '\n' ' ')"
+ok "no data or junk files"
+
+# --- tests for what changed ---
+if echo "$staged" | grep -E '^(backend/|docs/SECURITY\.md|by_billy/frontend/src/lib/dictionary\.ts)' >/dev/null; then
+  echo "▶ backend tests (fast, ~10 s)…"
+  (cd backend && .venv/bin/pytest -m "not ai" -q -p no:warnings -x) || fail "backend tests failed"
+  ok "backend tests"
+fi
+if echo "$staged" | grep -q '^contracts/'; then
+  echo "▶ contract tests…"
+  (cd contracts && npx hardhat test >/tmp/medseal-contracts.log 2>&1) || { cat /tmp/medseal-contracts.log; fail "contract tests failed"; }
+  ok "contract tests"
+fi
+if echo "$staged" | grep -q '^by_billy/frontend/'; then
+  echo "▶ frontend types + lint…"
+  (cd by_billy/frontend && npx tsc --noEmit -p . && npm run -s lint) || fail "frontend types/lint failed"
+  ok "frontend types + lint"
+fi
+exit 0

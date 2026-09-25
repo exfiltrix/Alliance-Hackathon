@@ -1,21 +1,32 @@
 # MedSeal
 
-MedSeal is a web platform that protects medical images (X-ray, CT) and the medical AI that
-reads them from tampering. Built for the National AI Hackathon (Namangan, 2026), track
-"Medicine", official task 6 (AI ethics and safety standards for X-ray/CT analysis).
+**A seal and an antivirus for medical images: we prove an X-ray or CT scan is authentic, and that the AI reading it cannot be fooled.**
 
-One-line pitch: a seal and an antivirus for medical images — we cryptographically prove an
-image has not changed since it was sealed, and we measure how easily the AI that reads it can
-be fooled.
+*Muhr va antivirus tibbiy tasvirlar uchun. · Печать и антивирус для медицинских снимков.*
 
-Six pieces, in one flow: **seal** an image at capture (tile hashes → Merkle root → Ed25519
-signature → append-only ledger) → **verify** it before a doctor or AI sees it (authentic /
-tampered / unsigned / forged) → an **AI detective** gives a probability for unsigned images →
-a **crash test** attacks a chest X-ray model (FGSM/PGD) and scores its robustness 0–10 → an
-**AI shield** flags adversarial noise before it reaches the model → a **model passport**
-turns all of that into a one-page, PDF-exportable report. See root `SPEC.md` for the full page
-list and acceptance criteria, `ARCHITECTURE.md` for the algorithms and data model, `API.md` for
-the endpoint contracts, and `DEMO.md` for the stage script.
+National AI Hackathon (Namangan, 2026) · track "Medicine" · official task №6 — ethics and safety standards for AI that reads X-ray and CT.
+
+## The problem
+
+- Fake tumours can be injected into or removed from CT scans; unwarned radiologists and a screening AI were fooled almost every time (CT-GAN, USENIX Security 2019).
+- When not warned, only 41% of radiologists spotted AI-generated X-rays (*Radiology*, 2026). The authors recommend cryptographic signatures at capture.
+- Invisible noise can flip a medical AI's diagnosis (adversarial attacks).
+- Uzbekistan is rolling out AI for chest X-ray and CT; task №6 says the safety standard for it is missing.
+
+## What MedSeal does
+
+| Module | What it gives | Certainty |
+|---|---|---|
+| **Seal** | Signs an image at capture: tiles → SHA-256 → Merkle root → Ed25519 signature → append-only ledger | exact (cryptography) |
+| **Verify** | Before a doctor or an AI sees an image: *authentic* / *tampered* (down to the 32×32 tile) / *unsigned* / *forged record* | exact |
+| **Blockchain anchor** | Every 10 min the ledger's Merkle root goes to a smart contract: nobody — a hacker, the hospital or us — can rewrite the history of seals | exact |
+| **AI detective** | For unsigned images: probability that the image was edited (ResNet18) | probability |
+| **AI shield** | Flags adversarial noise before the image reaches the diagnostic AI (feature squeezing) | warning |
+| **Crash test** | Attacks a medical AI (FGSM / PGD) and scores its robustness 0–10 | measured |
+| **Model passport** | One page per AI model: robustness, protection status, verdict, PDF | rules |
+| **Automation** | Scanner folder → sealed automatically; incoming folder → verified into the doctor's inbox (urgent first); QR code for the patient | — |
+
+The seal gives an exact answer; the detective and the shield give probabilities, and the UI always says so. Every AI verdict carries the note that the final decision is the doctor's. UI in Uzbek (default), Russian and English.
 
 ## Honest threat model
 
@@ -27,7 +38,10 @@ the endpoint contracts, and `DEMO.md` for the stage script.
 - The image's seal ID being stripped or replaced to hide that an edited image is a derivative of
   a sealed one (content-based recovery by perceptual hash + tile overlap, P1-03).
 - The whole hash chain being rewritten and re-linked consistently inside the database (external,
-  root-signed anchor file outside the database, CRY-03).
+  root-signed anchor file outside the database, CRY-03) — and independently, the blockchain
+  anchor: an insider with the database **and** the device keys can re-sign a fake and repair the
+  chain, but the root anchored on-chain still remembers the original, so verification says
+  *forged: blockchain mismatch*.
 - An adversarial (FGSM/PGD) perturbation reaching the diagnostic model undetected in most cases
   (feature-squeezing shield, calibrated at a 99th-percentile threshold — see the confidence
   intervals in every passport, not just the point estimate).
@@ -47,17 +61,59 @@ the endpoint contracts, and `DEMO.md` for the stage script.
 - A doctor being wrong: every AI verdict in the UI and PDF states that the final decision is the
   doctor's.
 
+Standard primitives (SHA-256 FIPS 180-4, Ed25519 RFC 8032) and a 12-point threat model —
+[docs/SECURITY.md](docs/SECURITY.md). Every threat marked ✅ has a test that performs the attack
+and checks it is caught; a test fails if a new threat is added without one
+(`backend/tests/test_threats.py`). Also: append-only audit log, security headers, rate limiting,
+decompression-bomb limits, secrets only in `.env`.
+
+## Measured, not promised
+
+| | Result |
+|---|---|
+| Seal / verify, 512×512 | ≈ 1 ms each (2048×2048: ≈ 16 ms) |
+| Change detected | a single pixel changed by 1 |
+| Shield | 0.9% false alarms on clean adult X-rays; PGD attacks caught 100% at ε ≥ 1 px, FGSM 62% / 87% / 100% at ε 1 / 2 / 4 |
+| Detective | AUC 0.94 on 1000 held-out images; finds ~8 of 10 edits (all removals); 8.4% false alarms — shown only as a probability |
+| Robustness score | `round(10 × (1 − share of diagnoses flipped at ε = 1 px), 1)` |
+
+Sources: `backend/app/ai/shield_calibration.json`, `backend/app/ai/detective_metrics.json`, `backend/tests/`.
+
+## How it works
+
+```
+ scanner ──► SEAL (gateway)                                     doctor / AI
+             tiles → SHA-256 → Merkle root → Ed25519 ──► ledger ──► VERIFY ──► result + red boxes
+                                                        │  (hash chain)  │
+                                     every 10 min: batch Merkle root     ├─ shield  (every image)
+                                                        ▼                └─ detective (unsigned only)
+                                              MedSealAnchor contract  ◄── root read from the chain,
+                                              (append-only, hashes only)   not from our database
+```
+
+- Each tile hash binds the image ID, tile position, shape and dtype: moving, cropping or swapping images is caught.
+- The ledger is a hash chain; editing a row without the device key breaks the signature.
+- Only hashes go on-chain — never images, never patient data. DICOM patient tags are stripped on upload.
+
 ## Quick start
+
+Requirements: Python 3.11+ (developed on 3.14), Node.js 20+.
 
 ### Backend
 
 ```bash
 cd backend
-python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # requirements.txt = runtime only
 export MEDSEAL_ADMIN_TOKEN=dev-admin-token         # required for /devices, /revoke, /crash-test, /passport
 .venv/bin/python -m scripts.create_root_key        # once: backend/keys/root.{pem,pub}
 .venv/bin/python -m scripts.create_demo_device      # once: prints a device token for the frontend
 .venv/bin/uvicorn app.main:app --reload --port 8000 # Swagger: http://localhost:8000/docs
+```
+
+Or everything for the demo in one command — local blockchain + contract + backend on :8000:
+
+```bash
+./demo.sh   # from the repo root; Ctrl+C stops all of it; port via MEDSEAL_PORT
 ```
 
 ### Frontend
@@ -85,6 +141,9 @@ Without a `MEDSEAL_GATEWAY_USER`/`PASSWORD`, the `/seal` page and its gateway AP
 every request with `503` (fail closed, P1-01) rather than opening up. Without
 `NEXT_PUBLIC_API_URL` and without `NEXT_PUBLIC_USE_MOCK=1`, API calls fail with an explicit
 "backend is not configured" error instead of silently showing demo data.
+
+Works offline: the blockchain runs locally (Hardhat). For a public testnet (Sepolia) put an RPC
+URL and a funded key in `backend/.env` — see `backend/.env.example`.
 
 ### First-time setup order
 
@@ -130,7 +189,8 @@ off or refuses requests, never silently permissive):
 | `MEDSEAL_STORAGE_DIR` | `backend/storage` | sealed files served by `GET /seal/{id}/file` |
 | `MEDSEAL_CORS_ORIGINS` | `localhost:3000` variants | comma-separated allowed origins |
 | `MEDSEAL_CORS_ORIGIN_REGEX` | private-LAN `:3000` pattern | LAN demo access from a phone |
-| `MEDSEAL_MAX_PIXELS` | `40000000` | pixel budget checked before decoding (SEC-03) |
+| `MEDSEAL_MAX_PIXELS` | `64000000` | pixel budget checked before decoding (T10) |
+| `MEDSEAL_RATE_LIMIT` | `120` | POST requests per client IP per minute (T11); `0` = off |
 | `MEDSEAL_DATA_DIR` | `../data` | public/synthetic datasets for crash tests |
 | `MEDSEAL_AI` | `1` | `0` disables the shield/detective inside `/verify` |
 | `MEDSEAL_ADMIN_TOKEN` | *(unset)* | bearer token for `/devices`, `/revoke`, `/crash-test`, `/passport` |
@@ -139,6 +199,8 @@ off or refuses requests, never silently permissive):
 | `MEDSEAL_REQUIRE_DEVICE_CERT` | `1` | `0` = migration mode: uncertified devices warn instead of failing verification |
 | `MEDSEAL_ANCHOR_PATH` | `backend/anchors/anchors.jsonl` | external, root-signed ledger anchors (CRY-03) |
 | `MEDSEAL_DETECTIVE_WEIGHTS` | `backend/weights/detective.pt` | trained detective CNN weights |
+| `RPC_URL` / `CONTRACT_ADDRESS` / `ANCHOR_PRIVATE_KEY` | *(unset)* | blockchain anchoring (`docs/BLOCKCHAIN.md`); unset = `blockchain: null` in `/verify` |
+| `MEDSEAL_WATCH` / `MEDSEAL_WATCH_DIR` | `1` / `../data/watch` | automation: folder watcher for auto-seal / auto-verify |
 
 Frontend (`by_billy/frontend/.env.local`, see `.env.example`):
 
@@ -161,10 +223,16 @@ cd backend
 ```
 
 ```bash
+cd contracts && npx hardhat test
+```
+
+```bash
 cd by_billy/frontend
 npm run lint
 npm run build
 ```
+
+They also run on every commit (`git config core.hooksPath .githooks`) and on GitHub Actions.
 
 ## Live end-to-end check (HYG-05)
 
@@ -196,3 +264,27 @@ value can be overridden through the environment (`MEDSEAL_GATEWAY_USER`, `MEDSEA
 | Old seals verify as `forged` / `untrusted_device` | The device predates device certificates. Run `python -m scripts.certify_devices` with `MEDSEAL_ADMIN_TOKEN` set. |
 | `No images in data/nih` | `python -m scripts.fetch_dataset` has not been run. |
 | `detective` is `null` in `/verify` | `weights/detective.pt` does not exist yet: run `python -m scripts.train_detective` (~20 min). Everything else (seal, verify, shield, crash test, passport) works without it. |
+
+## Team
+
+| Name | Role |
+|---|---|
+| Mirmahmudov Farrux | Backend developer |
+| Normirzayev Biloliddin | Frontend developer |
+| Akramov Doniyor | Designer |
+| Saidazimov Emir-Said | Analyst |
+
+## Repository
+
+```
+backend/            FastAPI: seal/, verify/, anchor/ (blockchain), ai/, passport/, automation/; tests/, scripts/
+by_billy/frontend/  Next.js 16 + TypeScript + Tailwind, uz / ru / en
+contracts/          MedSealAnchor smart contract (Solidity) + tests + deploy script
+docs/               SPEC, ARCHITECTURE, API, BLOCKCHAIN, SECURITY, DEMO, TASKS
+reference/          the original proof of concept the seal was ported from
+demo.sh             one-command demo
+```
+
+Data: public datasets only (NIH ChestX-ray14, CC0; Kermany pediatric X-rays) and synthetic
+forgeries. No real patient data is stored in the repository. DICOM patient tags are stripped on
+upload before anything is saved.

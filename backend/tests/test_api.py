@@ -34,13 +34,16 @@ def test_seal_requires_a_device_token(client, device):
     assert r.status_code == 401
 
 
-def test_admin_auth_rejects_non_ascii_without_500():
+def test_admin_auth_rejects_non_ascii_without_500(client):
     from fastapi import HTTPException
+    from starlette.requests import Request
 
+    from app import db
     from app.auth import require_admin
 
-    with pytest.raises(HTTPException) as exc:
-        require_admin("Bearer токен")
+    scope = {"type": "http", "method": "POST", "path": "/api/devices", "headers": [], "client": ("test", 0)}
+    with pytest.raises(HTTPException) as exc, db.SessionLocal() as session:
+        require_admin(Request(scope), "Bearer токен", session)
     assert exc.value.status_code == 401
 
 
@@ -610,7 +613,7 @@ def test_oversized_png_header_is_rejected_before_decode(client, device, monkeypa
     # header before Pillow tries to decode or allocate the claimed image.
     data = b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + b"IHDR" + struct.pack(">IIBBBBB", 512, 512, 8, 0, 0, 0, 0)
     response = client.post("/api/verify", files={"file": ("huge.png", data)})
-    assert response.status_code == 415
+    assert response.status_code == 413
     assert "too large" in response.json()["detail"].lower()
 
 

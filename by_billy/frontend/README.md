@@ -13,9 +13,10 @@ npm run dev          # http://localhost:3000
 2. `cp .env.example .env.local` and set `NEXT_PUBLIC_API_URL=http://localhost:8000/api`.
 3. Restart `npm run dev`.
 
-Without `NEXT_PUBLIC_API_URL` the site runs on demo data (`src/lib/mock.ts`) and shows a "Demo" badge.
+Demo data (`src/lib/mock.ts`) is opt-in: set `NEXT_PUBLIC_USE_MOCK=1` explicitly. Without a backend URL and
+without that flag, API calls fail with a configuration error instead of silently using mocks.
 
-Contract: `API.md` in the repository root is the source of truth. The TypeScript types in `src/lib/types.ts` match it; all requests go through `src/lib/api.ts`.
+Contract: `docs/API.md` in the repo root is the source of truth (the backend follows it). The TypeScript types in `src/lib/types.ts` match it one-to-one; all requests go through `src/lib/api.ts`.
 
 ## Where things are
 

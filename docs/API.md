@@ -3,7 +3,7 @@
 All image uploads: `multipart/form-data`, field `file` (DICOM `.dcm` or `.png`). Images returned as base64 PNG previews (no `data:` prefix — use `data:image/png;base64,${preview_png}`).
 Interactive docs while the backend runs: http://localhost:8000/docs. CORS allows `http://localhost:3000`.
 
-Errors: `{"detail": "message"}` with status `404` (not found), `409` (conflict), `413` (file too large, > 50 MB), `415` (not a DICOM/PNG), `422` (missing/invalid field).
+Errors: `{"detail": "message"}` with status `404` (not found), `409` (conflict), `413` (file too large, > 50 MB, or decodes to > 64 Mpx), `429` (more than 120 POSTs per minute from one IP; `Retry-After` header), `415` (not a DICOM/PNG), `422` (missing/invalid field).
 All times are UTC ISO strings: `"2026-09-26T10:00:00Z"`.
 
 ## Devices
@@ -62,6 +62,9 @@ Python backend still separately requires the device bearer token (P0-1) regardle
   "matched_by": "uid | content | null",
   "warning": "device_revoked_later",
   "patient_check": "matched | mismatch | not_available",
+  "sealed_at": "2026-09-26T10:00:00Z",
+  "blockchain": { "status": "anchored", "block": 6712345, "time": "2026-09-26T10:10:12Z",
+                  "tx_hash": "0x…", "tx_url": "https://sepolia.etherscan.io/tx/0x…", "chain_id": 11155111 },
   "verify_ms": 1.1,
   "preview_png": "base64…",
   "detective": { "probability": 0.87, "experimental": true },
@@ -70,10 +73,16 @@ Python backend still separately requires the device bearer token (P0-1) regardle
 ```
 - `changed_tiles`: `[y, x]` of the top-left corner of each changed tile, in original image pixels; tile size is `tile`. `preview_png` already has red-outer/white-inner boxes drawn on them (visible in greyscale mode too; preview is scaled down to max 1024 px).
 - `unsigned`: `uid`, `device`, `seal_id`, `tile` are `null`.
-- `forged`: extra field `reason` = `ledger_entry_modified | bad_signature | device_revoked | unknown_device | untrusted_device` (**CRY-02**: the device has no valid root-signed certificate — a forged device row or a swapped public key). `changed_tiles` is empty (tiles are not compared against an untrusted record).
+- `forged`: extra field `reason` = `ledger_entry_modified | bad_signature | device_revoked | unknown_device | untrusted_device | blockchain_mismatch` (**CRY-02**: `untrusted_device` = the device has no valid root-signed certificate — a forged device row or a swapped public key). `changed_tiles` is empty (tiles are not compared against an untrusted record).
 - **CRY-01 patient binding:** `patient_check` = `"matched"` (the upload's DICOM PatientID hashes to the same `patient_ref` the seal was made with), `"mismatch"` (an authentic-looking image attached to the wrong patient — the response is `status: "tampered", reason: "patient_mismatch"` even though every tile and pixel is untouched), or `"not_available"` (no PatientID on the upload, no `MEDSEAL_PATIENT_SALT` configured, or the row predates `sig_version` 2 and was never bound to a patient).
 - **CRY-02 migration:** `warning` can also be `"device_not_certified"` (only when `MEDSEAL_REQUIRE_DEVICE_CERT=0`; a seal from an as-yet-uncertified device that would otherwise be `untrusted_device`).
 - **IMG-05:** for a DICOM whose `Modality` is not `CR`/`DX` (e.g. a CT slice), `detective` and `shield` are both `null` and the response carries `"ai_note": "not_applicable"` — the bundled models are chest X-ray only and must not silently score images outside that domain.
+- `sealed_at` (on `authentic`/`tampered`): when the image was sealed — together with `device` it exposes a replayed old image (threat T6).
+- `blockchain` (docs/BLOCKCHAIN.md): `null` when anchoring is off on the backend or the image is `unsigned`. Otherwise `status` =
+  - `anchored` — the ledger entry matches the Merkle root stored on-chain (read from the chain, not our DB); `block`, `time` (on-chain block time), `tx_hash`, `tx_url` (explorer link, `null` on a local chain), `chain_id`.
+  - `pending` — sealed after the last batch; anchored within ~10 min (`POST /anchors/run` in the demo).
+  - `unavailable` — the chain could not be reached; the seal check above still stands.
+  - `mismatch` — **critical**: our database was rewritten after anchoring (`detail: "proof_missing"` if the proof itself was deleted). Always comes with `status: "forged"`, `reason: "blockchain_mismatch"`, even when every local check passed — an insider with the database and the device keys can fool those, not the chain. Show the Etherscan link: the original fingerprint and time are there.
 - `tampered` can also carry `reason: "metadata_changed"` + `changed_meta: [tag names]` when a display-affecting DICOM tag (RescaleSlope/Intercept, WindowCenter/Width, Laterality, PixelSpacing, ...) was edited without touching any pixel — those tags never touch tile hashes, so they are bound into the signature separately (P0-5).
 - `warning` (optional, on `authentic`/`tampered` only) = `device_revoked_later`: the device was revoked **after** this particular seal was made, so the seal itself is still trusted — revocation is not retroactive. A seal made at/after the device's `revoked_at` is `forged`/`device_revoked` instead, not a warning.
 - **P1-03 content-based recovery.** `matched_by` = `"uid"` (the normal case: the record was found by the image's own ID), `"content"` (the ID was missing, stripped or replaced — the record was found instead by comparing pixels against every previously sealed image of the same shape/dtype), or `null` (`unsigned` only — no match at all). On a `"content"` match: all tiles and metadata identical → `authentic` + `warning: "seal_id_missing"` (an untouched image whose ID chunk was dropped, e.g. by a re-save that strips PNG text chunks); anything different → `tampered` + `reason: "seal_id_removed"` + `changed_tiles` computed against the matched record. `POST /seal` also refuses (`409`) to seal an ID-less image that is a partial (not exact) content match of something already sealed — that would otherwise let an attacker strip the ID, edit the image, and get a brand-new "clean" seal for a forged derivative.
@@ -82,6 +91,40 @@ Python backend still separately requires the device bearer token (P0-1) regardle
 - `shield` runs on every status, including `authentic`: the seal proves where the image came from, the shield checks whether its pixels carry an adversarial attack (an attacked image can be sealed too).
 - `shield.score` is a distance, not a percentage (clean X-rays ≈ 3–8, attacked ≈ 10–100+); `attack_suspected = score > threshold`. Show it as "Yashirin hujum aniqlandi" / "Shubhali shovqin topilmadi" plus `score / threshold`, not as "87%". About 1% of clean images raise a false alarm, so it is a warning, not a verdict. Takes ~50 ms (first call after startup ~2 s: model load).
 - UI labels: `authentic`/`tampered`/`forged` are certain ("Tasdiqlangan"); `detective` is a probability ("Ehtimollik 87%"), `shield` is a warning (see above).
+
+## Blockchain anchoring
+`GET /anchors` → `{ "enabled": true, "pending": 3, "anchors": [ {id, root, count, tx_hash, tx_url, block, chain_id, onchain_index, status, created_at}, … ] }` (newest first; `enabled: false` = anchoring off).
+`POST /anchors/run` — admin token. Anchors every pending seal now, waits for the confirmation (local chain: instant; Sepolia ~15 s). → `{ "anchored": 5, "anchor": {…} }` or `{ "anchored": 0, "anchor": null }`; `503` if anchoring is off or the chain is unreachable (sealing and verifying keep working).
+
+## Audit log
+`GET /audit?limit=200&action=seal` — admin token. Newest first: `[{id, at, action, actor, target, result, ip}]`.
+`action` = `seal | verify | device_create | device_revoke | anchor | auth_failed`; `actor` = `admin`, `device:<name>`, `anonymous`, `inbox:upload|folder`, `patient-qr`, `scheduler`. There is no endpoint that changes or deletes audit rows.
+
+## Automation (no clicks)
+Folders (backend setting `MEDSEAL_WATCH_DIR`, default `data/watch`), polled every 2 s while the backend runs (`MEDSEAL_WATCH=0` turns it off):
+- `scanner/` — the X-ray machine drops files here → sealed by the gateway device `Shlyuz-Auto` → sealed copy moved to `incoming/`.
+- `incoming/` — images arriving at the doctor → verified → inbox. Done files go to `<folder>/processed/`, unreadable ones to `failed/`.
+
+`GET /automation` → `{watching, scanner_dir, incoming_dir, interval_s, gateway, sealed, verified, failed, last_event: {at, text} | null, warmup}`
+`POST /automation/run` → process both folders now → `{sealed, verified}`
+
+## Inbox (doctor)
+`POST /inbox` — multipart, field `files` (repeat, max 50) → the new items, most urgent first.
+`GET /inbox` → `{counts: {danger, warning, ok, total}, items: [item]}` — counts are unreviewed only; order: unreviewed, then danger → warning → ok, then newest.
+`GET /inbox/{id}` → item + `result` (the full `/verify` response, or `{error}` for unreadable files) · `POST /inbox/{id}/review` → item with `reviewed: true`.
+```json
+{ "id": 7, "file_name": "patient_A.png", "source": "upload | folder", "received_at": "…",
+  "status": "authentic | tampered | unsigned | forged | error", "severity": "danger | warning | ok",
+  "reasons": ["tampered" | "forged" | "attack_suspected" | "unsigned" | "unreadable" | "device_revoked_later"],
+  "reviewed": false, "device": "Shlyuz-Auto", "changed_tiles": 0, "detective_probability": null, "error": null }
+```
+- danger = tampered / forged / shield attack / unreadable; warning = unsigned (detective gives a probability) or device revoked later; ok = authentic and shield quiet.
+
+## Public QR check (patients, no login)
+`POST /seal` also returns `check_token` (random, not the seal id). Frontend page: `/check/{check_token}`.
+`GET /check/{token}` → `{status: "valid" | "warning" | "invalid", reason, hospital, device, sealed_at, shape}` — no image, no patient data. 404 unknown token.
+`POST /check/{token}` — form `file` → `{status: "authentic" | "tampered" | "forged" | "unsigned" | "mismatch", reason, changed_tiles, preview_png}` (`mismatch` = a different image than the one behind this QR).
+`GET /check/{token}/qr.png?url=<the check page URL>` → QR PNG (url must be http(s) and contain the token).
 
 ## Models
 `GET /models` → `[{id, name, version, source, intended_use}]` — the built-in torchxrayvision DenseNet is created on startup; it is the only model that can be crash-tested.

@@ -1,10 +1,11 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import audit
 from app.auth import hash_token, new_device_token, require_admin
 from app.db import get_session
 from app.models import Device, iso_utc, utcnow
@@ -35,7 +36,7 @@ def list_devices(session: Session = Depends(get_session)):
 
 
 @router.post("", status_code=201, dependencies=[Depends(require_admin)])
-def create_device(body: DeviceIn, session: Session = Depends(get_session)):
+def create_device(body: DeviceIn, request: Request, session: Session = Depends(get_session)):
     """Creates the device, its key pair and a bearer token.
 
     The token is returned ONLY in this response — only its sha256 is stored (token_hash).
@@ -54,12 +55,14 @@ def create_device(body: DeviceIn, session: Session = Depends(get_session)):
     keys.certify_device(device)
     token = new_device_token()
     device.token_hash = hash_token(token)
+    audit.log(session, "device_create", "admin", target=f"device:{device.id}", result=device.name,
+              ip=audit.client_ip(request))
     session.commit()
     return device_json(device) | {"token": token}
 
 
 @router.post("/{device_id}/revoke", dependencies=[Depends(require_admin)])
-def revoke_device(device_id: int, session: Session = Depends(get_session)):
+def revoke_device(device_id: int, request: Request, session: Session = Depends(get_session)):
     """Seals made by this device AFTER revoked_at verify as `forged` (reason: device_revoked).
     Seals made before it (e.g. the key was stolen just now, not at creation) stay authentic/tampered
     as normal, with a warning — see verify.service."""
@@ -72,5 +75,7 @@ def revoke_device(device_id: int, session: Session = Depends(get_session)):
         # is never part of a hash, and second-level rounding could otherwise tie with a seal's
         # created_at made moments earlier in the same test/request burst.
         device.revoked_at = datetime.now(timezone.utc)
+    audit.log(session, "device_revoke", "admin", target=f"device:{device.id}", result=device.name,
+              ip=audit.client_ip(request))
     session.commit()
     return device_json(device)
