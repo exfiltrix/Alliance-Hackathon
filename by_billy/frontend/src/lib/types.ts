@@ -42,9 +42,10 @@ export type VerifyResponse = {
   warning?: "device_revoked_later" | "seal_id_missing";
   verify_ms?: number;
   preview_png: string;
-  // null when the AI is off on the backend; the detective key only exists for unsigned images
-  detective?: { probability: number; heatmap_png: string; experimental: boolean } | null;
+  // null when the AI is off on the backend; the public API intentionally omits Grad-CAM output.
+  detective?: { probability: number; experimental: boolean } | null;
   shield: { attack_suspected: boolean; score: number; threshold: number } | null;
+  ai_note?: "not_applicable";
   note: string;
 };
 

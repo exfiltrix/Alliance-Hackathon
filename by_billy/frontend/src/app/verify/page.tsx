@@ -52,6 +52,18 @@ export default function VerifyPage() {
     setError(null);
   };
 
+  const shieldAttack = result?.shield?.attack_suspected === true;
+  const headline = result?.status === "authentic" && shieldAttack
+    ? d.status.authenticWithAttack
+    : result
+      ? d.status[result.status]
+      : null;
+  const statusClass = result?.status === "authentic" && shieldAttack
+    ? "border-amber-300 bg-amber-50 text-amber-900"
+    : result
+      ? statusStyle[result.status]
+      : "";
+
   return (
     <PageShell title={t(d.title)} subtitle={t(d.subtitle)} icon={VerifyIcon} step="verify">
       {!result && (
@@ -74,16 +86,16 @@ export default function VerifyPage() {
 
       {result && (
         <div className="space-y-6">
-          <div role="status" className={`rounded-2xl border p-5 ${statusStyle[result.status]}`}>
+          <div role="status" className={`rounded-2xl border p-5 ${statusClass}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xl font-semibold">{t(d.status[result.status].title)}</p>
-              {result.status !== "unsigned" && (
+              <p className="text-xl font-semibold">{headline ? t(headline.title) : ""}</p>
+              {result.status !== "unsigned" && !(result.status === "authentic" && shieldAttack) && (
                 <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-medium">
                   {t(dictionary.common.certain)}
                 </span>
               )}
             </div>
-            <p className="mt-1 text-sm opacity-90">{t(d.status[result.status].desc)}</p>
+            <p className="mt-1 text-sm opacity-90">{headline ? t(headline.desc) : ""}</p>
             {result.status === "forged" && result.reason && (
               <p className="mt-1 text-sm font-medium">{t(d.forgedReasons[result.reason])}</p>
             )}
@@ -102,7 +114,7 @@ export default function VerifyPage() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={pngSrc(result.preview_png)}
-                    alt={`${t(d.preview)}: ${t(d.status[result.status].title)}`}
+                    alt={`${t(d.preview)}: ${headline ? t(headline.title) : t(d.status[result.status].title)}`}
                     className="block max-h-[480px] w-auto max-w-full"
                   />
                 </div>
@@ -123,6 +135,12 @@ export default function VerifyPage() {
                   {result.status === "tampered" && result.reason === "metadata_changed" && (
                     <Field label={t(d.metadataChanged)} value={(result.changed_meta ?? []).join(", ")} />
                   )}
+                </Card>
+              )}
+
+              {result.ai_note && (
+                <Card className="border-amber-200 bg-amber-50">
+                  <p className="text-sm text-amber-900">{t(d.aiNote[result.ai_note])}</p>
                 </Card>
               )}
 

@@ -4,6 +4,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/lib/language-context";
 import { INIT_SCRIPT } from "@/lib/a11y-init";
 import SkipLink from "@/components/SkipLink";
+import MockBanner from "@/components/MockBanner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <LanguageProvider>
           <SkipLink />
+          <MockBanner />
           {children}
         </LanguageProvider>
       </body>

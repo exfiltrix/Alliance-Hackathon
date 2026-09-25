@@ -9,9 +9,9 @@ import type {
 } from "./types";
 import { mockApi } from "./mock";
 
-// Backend runs separately (no Docker). Leave NEXT_PUBLIC_API_URL unset to use mock data.
+// Mock data is opt-in. A missing backend URL is a configuration error, never a silent fake.
 const RAW_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
-export const USE_MOCK = !RAW_BASE;
+export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "1";
 
 // With NEXT_PUBLIC_API_URL=http://localhost:8000/api the site also works when opened from another
 // device (http://<laptop IP>:3000): the browser then talks to the backend on that same host.
@@ -33,6 +33,9 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  if (!API_BASE_URL) {
+    throw new ApiError(503, "Backend is not configured: set NEXT_PUBLIC_API_URL or explicitly enable NEXT_PUBLIC_USE_MOCK=1");
+  }
   const isForm = init?.body instanceof FormData;
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
@@ -66,7 +69,9 @@ const post = <T>(path: string, body: unknown) =>
 // download_url from the backend is absolute-path ("/api/seal/12/file").
 export function backendUrl(path: string): string {
   if (USE_MOCK || /^https?:|^data:/.test(path)) return path;
-  return new URL(path, API_BASE_URL).toString();
+  if (!API_BASE_URL) return path;
+  if (path.startsWith("/api/seal/") && path.endsWith("/file")) return path;
+  return new URL(path, `${API_BASE_URL}/`).toString();
 }
 
 export function pngSrc(b64OrUrl: string): string {

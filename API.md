@@ -63,7 +63,7 @@ Python backend still separately requires the device bearer token (P0-1) regardle
   "warning": "device_revoked_later",
   "verify_ms": 1.1,
   "preview_png": "base64…",
-  "detective": { "probability": 0.87, "heatmap_png": "base64…", "experimental": false },
+  "detective": { "probability": 0.87, "experimental": true },
   "shield": { "attack_suspected": false, "score": 3.64, "threshold": 10.42 },
   "note": "Final decision is made by the doctor." }
 ```
@@ -74,7 +74,7 @@ Python backend still separately requires the device bearer token (P0-1) regardle
 - `warning` (optional, on `authentic`/`tampered` only) = `device_revoked_later`: the device was revoked **after** this particular seal was made, so the seal itself is still trusted — revocation is not retroactive. A seal made at/after the device's `revoked_at` is `forged`/`device_revoked` instead, not a warning.
 - **P1-03 content-based recovery.** `matched_by` = `"uid"` (the normal case: the record was found by the image's own ID), `"content"` (the ID was missing, stripped or replaced — the record was found instead by comparing pixels against every previously sealed image of the same shape/dtype), or `null` (`unsigned` only — no match at all). On a `"content"` match: all tiles and metadata identical → `authentic` + `warning: "seal_id_missing"` (an untouched image whose ID chunk was dropped, e.g. by a re-save that strips PNG text chunks); anything different → `tampered` + `reason: "seal_id_removed"` + `changed_tiles` computed against the matched record. `POST /seal` also refuses (`409`) to seal an ID-less image that is a partial (not exact) content match of something already sealed — that would otherwise let an attacker strip the ID, edit the image, and get a brand-new "clean" seal for a forged derivative.
 - `detective` key is present only when `status == "unsigned"` (a sealed image is checked by the seal, exactly). `detective` / `shield` are `null` when the AI is off (`MEDSEAL_AI=0`, torch not installed, detective not trained) — the UI must handle `null` for both.
-- `detective.probability` = chance the image was edited (0..1). `heatmap_png` is a 448×448 RGB PNG of the 224×224 picture the model sees (centre square crop of the image), with a Grad-CAM heatmap where the detective looked; show it next to the preview, not over it. `experimental: true` → add an "experimental" badge (the detective scored below AUC 0.9 on held-out images). ~50 ms; the first call after startup ~1 s.
+- `detective.probability` = chance the image was edited (0..1). The public verification response intentionally does not include Grad-CAM/heatmap output; it remains available to training evaluation code only. `experimental` is currently always `true`: the detector has not been validated on real, non-synthetic forgeries. ~50 ms; the first call after startup ~1 s.
 - `shield` runs on every status, including `authentic`: the seal proves where the image came from, the shield checks whether its pixels carry an adversarial attack (an attacked image can be sealed too).
 - `shield.score` is a distance, not a percentage (clean X-rays ≈ 3–8, attacked ≈ 10–100+); `attack_suspected = score > threshold`. Show it as "Yashirin hujum aniqlandi" / "Shubhali shovqin topilmadi" plus `score / threshold`, not as "87%". About 1% of clean images raise a false alarm, so it is a warning, not a verdict. Takes ~50 ms (first call after startup ~2 s: model load).
 - UI labels: `authentic`/`tampered`/`forged` are certain ("Tasdiqlangan"); `detective` is a probability ("Ehtimollik 87%"), `shield` is a warning (see above).
@@ -144,7 +144,7 @@ when done:
   "protocol": { "method": "pgd", "min_images": 50, "eps_required": [1] },
   "note": "Final decision is made by the doctor." }
 ```
-- `verdict`: `allowed` (score ≥ 7) · `allowed_with_conditions` (score < 7, shield compatible) · `not_allowed` (score < 7, no compatible shield). Show the rule under the verdict — it is built from `rules`.
+- `verdict` is a research robustness assessment, not a regulatory or clinical permission. Codes remain `allowed` / `allowed_with_conditions` / `not_allowed` for API stability; display text must say what the measured thresholds mean. The current decision rules are built from `rules` and are not a clinical validation.
 - `shield.compatible` = catches ≥ 90% PGD attacks at eps 1 px with ≤ 2% false alarms. If the shield is not calibrated: `{"available": false, "compatible": false}` only.
 - `conditions` are codes; texts go in the frontend dictionary (the PDF has the same texts in `backend/app/passport/i18n.py`):
   - `shield_required` — every image passes the MedSeal shield before the model

@@ -49,7 +49,6 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
 
   const pdfUrl = passport ? api.passportPdfUrl(passport.id, lang) : "";
   const r = passport?.robustness;
-  const pipelineProtected = passport ? passport.pipeline.devices_active > 0 && passport.pipeline.ledger_ok : false;
 
   return (
     <PageShell title={t(d.title)} subtitle={t(d.subtitle)} icon={PassportIcon} step="passport" backHref="/crash-test">
@@ -111,7 +110,9 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
                     <Field label={t(d.shieldFalseAlarms)} value={pct(passport.shield.false_positive_rate, 1)} />
                   </>
                 )}
-                <Field label={t(d.pipelineProtected)} value={yesNo(pipelineProtected)} />
+                <Field label={t(d.activeDevices)} value={passport.pipeline.devices_active} />
+                <Field label={t(d.sealsCount)} value={passport.pipeline.seals} />
+                <Field label={t(d.ledgerIntegrity)} value={passport.pipeline.ledger_ok ? t(dictionary.common.yes) : t(dictionary.common.no)} />
                 <Field label={t(d.crashTest)} value={`${r.crash_test_id} · ${r.method.toUpperCase()}`} />
                 <Field label={t(d.testedOn)} value={r.n_images} />
                 <Field

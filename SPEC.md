@@ -30,7 +30,7 @@ Hospitals are starting to trust AI to read X-rays and CT scans. Both the image a
 - Upload any image. Three possible outcomes:
   - **Authentic** (green): signature valid, all tiles match.
   - **Tampered** (red): image shown with red boxes on changed tiles + "Snimok suratga olingandan keyin o'zgartirilgan".
-  - **Unsigned** (grey): no seal found → run the AI detective → probability + heatmap, clearly labelled as a probability.
+  - **Unsigned** (amber warning): no seal found → the image's origin cannot be confirmed; the detective (when applicable) returns an experimental probability, clearly labelled as a probability.
 - Also runs the AI shield: "Yashirin hujum aniqlandi" (hidden attack detected) if adversarial noise is suspected.
 - ✅ Detects a single changed pixel. ✅ Rejects a ledger record edited without the private key.
 
@@ -41,7 +41,7 @@ Hospitals are starting to trust AI to read X-rays and CT scans. Both the image a
 - ✅ Runs on 50 images in < 2 minutes on CPU.
 
 ### 4. Model passport (`/passport/[id]`)
-- Model name/version, intended use, robustness score, shield compatibility, protection status of image pipeline, verdict: *Allowed / Allowed with conditions / Not allowed*, responsible organisation.
+- Model name/version, intended use, robustness score, shield compatibility, factual pipeline counts, and a research robustness assessment with stable codes `allowed` / `allowed_with_conditions` / `not_allowed`; it is not a clinical or regulatory permit.
 - Export to PDF.
 
 ### 5. Dashboard (`/dashboard`) — optional

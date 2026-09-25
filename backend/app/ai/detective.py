@@ -87,5 +87,8 @@ def check(px: np.ndarray) -> dict:
     return {
         "probability": round(prob, 3),
         "heatmap_png": overlay_png(img, cam),
-        "experimental": metrics()["test"]["auc"] < EXPERIMENTAL_BELOW_AUC,
+        # The detector remains experimental until it is validated on real, non-synthetic
+        # forgeries. The committed synthetic metrics (heatmap hits ≈ chance and high
+        # out-of-domain false-alarm rate) are not a clinical validation result.
+        "experimental": True,
     }

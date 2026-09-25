@@ -50,9 +50,9 @@ T = {
         "note": "AI faqat maslahat beradi. Yakuniy qarorni shifokor qabul qiladi.",
         "footer": "MedSeal · pasport № {id} · {date}",
         "verdicts": {
-            "allowed": "Ruxsat etiladi",
-            "allowed_with_conditions": "Shartli ruxsat etiladi",
-            "not_allowed": "Ruxsat etilmaydi",
+            "allowed": "Tadqiqot chegarasiga mos",
+            "allowed_with_conditions": "Shartlar bilan tadqiqot chegarasida",
+            "not_allowed": "Tadqiqot chegarasiga yetmagan",
         },
         "condition_texts": {
             "shield_required": "Har bir tasvir modelga berilishidan oldin MedSeal qalqonidan oʻtishi shart.",
@@ -109,9 +109,9 @@ T = {
         "note": "ИИ только помогает. Окончательное решение принимает врач.",
         "footer": "MedSeal · паспорт № {id} · {date}",
         "verdicts": {
-            "allowed": "Разрешено",
-            "allowed_with_conditions": "Разрешено с условиями",
-            "not_allowed": "Не разрешено",
+            "allowed": "Соответствует исследовательскому порогу",
+            "allowed_with_conditions": "Исследовательский порог с условиями",
+            "not_allowed": "Не достигает исследовательского порога",
         },
         "condition_texts": {
             "shield_required": "Каждый снимок проходит ИИ-щит MedSeal до того, как попадёт в модель.",

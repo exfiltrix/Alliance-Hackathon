@@ -19,7 +19,7 @@ const jobs = new Map<number, { started: number; modelId: number; n: number; meth
 const passports = new Map<number, Passport>();
 let nextId = 100;
 
-const FLIP = { "0.5": 0.12, "1": 0.48, "2": 0.9, "4": 1 };
+const FLIP = { "0.5": 0.12, "1": 0.98, "2": 1, "4": 1 };
 const PSNR = { "0.5": 58.3, "1": 52.1, "2": 46.2, "4": 40.1 };
 
 function mockPassport(id: number, model: AiModel, crashTestId: number): Passport {
@@ -47,7 +47,7 @@ function mockPassport(id: number, model: AiModel, crashTestId: number): Passport
       available: true,
       compatible: true,
       method: "median 3x3, L1 distance of DenseNet logits",
-      threshold: 10.4,
+      threshold: 10.419,
       false_positive_rate: 0.009,
       detection_pgd_eps1: 1,
       detection_fgsm_eps1: 0.62,
@@ -119,16 +119,6 @@ async function fileToPreview(file: File, tiles: [number, number][]): Promise<str
   }
 }
 
-function heatmap(): string {
-  const [c, ctx] = canvas(224, 224);
-  const g = ctx.createRadialGradient(150, 100, 5, 150, 100, 60);
-  g.addColorStop(0, "rgba(239,68,68,0.85)");
-  g.addColorStop(1, "rgba(239,68,68,0)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 224, 224);
-  return c.toDataURL("image/png");
-}
-
 export const mockApi: Api = {
   async seal(file) {
     await wait(600);
@@ -151,8 +141,8 @@ export const mockApi: Api = {
     const attacked = /attack|adv/.test(name);
     const shield = {
       attack_suspected: attacked,
-      score: attacked ? 0.34 : 0.03,
-      threshold: 0.11,
+      score: attacked ? 12.5 : 3.64,
+      threshold: 10.419,
     };
     const note = "Final decision is made by the doctor.";
     let res: VerifyResponse;
@@ -205,7 +195,7 @@ export const mockApi: Api = {
         matched_by: null,
         changed_tiles: [],
         preview_png: await fileToPreview(file, []),
-        detective: { probability: 0.87, heatmap_png: heatmap(), experimental: false },
+        detective: { probability: 0.87, experimental: true },
         shield,
         note,
       };
@@ -261,7 +251,7 @@ export const mockApi: Api = {
   async getStats() {
     await wait(250);
     return {
-      sealed: 128, verified: 342, authentic: 290, tampered: 7, unsigned: 41, forged: 4, models_tested: 3, avg_robustness: 5.8,
+      sealed: 128, verified: 342, authentic: 290, tampered: 7, unsigned: 41, forged: 4, models_tested: 3, avg_robustness: 0.2,
     };
   },
 };

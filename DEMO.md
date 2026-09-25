@@ -31,7 +31,11 @@ Growth: pilot hospital → all regions → Central Asia.
 ## Jury Q&A
 | Question | Answer |
 |---|---|
-| Where is the AI? | Detective (finds fakes without a seal), crash test (AI attacks AI), shield (blocks hidden attacks). The seal itself is math — that's why it's 100% certain. |
+| Where is the AI? | Detective (gives an experimental tampering probability for images without a seal), crash test (measures robustness against attacks), and shield (raises a warning for likely adversarial noise). The seal is a cryptographic integrity check; it is not a clinical diagnosis or a claim that the AI cannot be fooled. |
+| What if someone deletes the image ID? | Verification searches same-shape/dtype records by a non-signed dHash and then requires at least half of the original tiles to match. A partial derivative is reported as tampered with `seal_id_removed`; an identical re-save is reported as authentic with a warning. In production, add indexed candidate search and rate limits. |
+| Who can seal? | In this demo, the `/seal` page and its server-side gateway routes require HTTP Basic Auth, and the backend still requires a per-device bearer token. Production would put the signing key in a gateway/HSM next to the scanner and expose no browser form. |
+| What if the server is hacked? | Today the demo root key is on the same host and a database write can still be dangerous; device certificates and external anchors detect more tampering, but this is not an HSM deployment. Production should keep the root key offline/HSM, use least-privilege services, and alert on anchor/device-certificate failures. |
+| Is the shield robust to an attacker who knows about it? | The committed numbers test only attacks that do not know about the shield. We report that limitation and the confidence intervals; adaptive attacks were not established here, so the shield must remain a warning rather than a guarantee. |
 | What if the key is stolen? | Keys live only in the gateway (hardware module in production), can be revoked and rotated. |
 | Old images? | Archive can be sealed once from today; the detective covers images without a seal. |
 | Does it slow doctors down? | Seal/verify takes milliseconds per image. |

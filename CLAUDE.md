@@ -8,11 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Проект для National AI Hackathon (Наманган, 2026), трек «Медицина», официальная задача №6
 (стандарты этики и безопасности ИИ для анализа рентгена/КТ).
 
-Питч в одну строку: *«Печать и антивирус для медицинских снимков: доказываем, что снимок подлинный, а ИИ, который его читает, нельзя обмануть».*
+Питч в одну строку: *«Печать и антивирус для медицинских снимков: подтверждаем целостность снимка и измеряем, насколько легко обмануть ИИ, который его читает».*
 
 ## Текущее состояние репозитория
 
 - Работа поделена: backend ведёт владелец репозитория, frontend — второй разработчик. Контракт между ними — `API.md`; любое изменение ответа API сразу отражать там.
+- **Честность AI-результатов:** детектор и щит дают вероятностные предупреждения и показываются как экспериментальные/условные; окончательное клиническое решение принимает врач. Паспорт — это исследовательская оценка устойчивости, а не разрешение на клиническое применение.
 - Backend готов: устройства, печать, проверка, реестр с hash-chain, `/stats`, краш-тест, щит, паспорт + PDF. `app/ai/hooks.py` — точка подключения ИИ к `/verify`: щит и детектив подключены (детектив возвращает `null`, пока нет весов `backend/weights/detective.pt` — они в .gitignore, обучение: `python -m scripts.train_detective`, ~20 мин).
 - **Аутентификация записи (harden v2, P0-1):** `POST /devices` и `/devices/{id}/revoke` требуют `Authorization: Bearer <MEDSEAL_ADMIN_TOKEN>`. `POST /seal` требует `Authorization: Bearer <device token>` — устройство определяется по токену, поля `device_id` в форме больше нет. Токен устройства выдаётся один раз при создании (`POST /devices` возвращает `token` в ответе), хранится только его sha256 (`devices.token_hash`, см. `app/auth.py`). Демо-устройство создаётся напрямую в БД без HTTP: `python -m scripts.create_demo_device`. Фронтенд никогда не хранит токен в `NEXT_PUBLIC_*` — печать идёт через серверный роут `by_billy/frontend/src/app/api/seal/route.ts`, который берёт токен из `MEDSEAL_DEVICE_TOKEN` (`.env.local`, только на сервере Next.js).
 - **P1-01 (audit remediation):** страница `/seal` и роуты `/api/seal`, `/api/crash-test`, `/api/passport` дополнительно закрыты HTTP Basic Auth на уровне Next.js: `by_billy/frontend/src/proxy.ts` (Proxy — так в Next 16 называется бывший Middleware, работает на Node.js runtime по умолчанию) перехватывает запрос первым, каждый route handler проверяет ещё раз (`src/lib/gatewayAuth.ts`). Креды — `MEDSEAL_GATEWAY_USER`/`MEDSEAL_GATEWAY_PASSWORD` в `.env.local`; без них — `503` (fail closed). `/api/seal` также отклоняет тела > 50 МБ (`413`) по заголовку `Content-Length`, до чтения тела.

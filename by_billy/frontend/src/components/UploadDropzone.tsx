@@ -35,7 +35,7 @@ export default function UploadDropzone({
     >
       <input
         type="file"
-        accept=".dcm,.dicom,.png,.jpg,.jpeg"
+        accept=".dcm,.dicom,.png"
         className="sr-only"
         disabled={disabled}
         onChange={(e) => {
@@ -60,7 +60,7 @@ export default function UploadDropzone({
       ) : (
         <>
           <span className="text-sm font-medium">{t(dictionary.common.upload)}</span>
-          <span className="text-xs text-muted">DICOM (.dcm) · PNG · JPG</span>
+          <span className="text-xs text-muted">DICOM (.dcm) · PNG</span>
         </>
       )}
     </label>

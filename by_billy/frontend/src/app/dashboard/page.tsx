@@ -38,6 +38,7 @@ export default function DashboardPage() {
         { label: t(d.verified), value: stats.verified },
         { label: t(d.tampered), value: stats.tampered, danger: true },
         { label: t(d.unsigned), value: stats.unsigned },
+        { label: t(d.forged), value: stats.forged, danger: true },
         { label: t(d.modelsTested), value: stats.models_tested },
         {
           label: t(d.avgRobustness),

@@ -37,9 +37,9 @@ const dictionary = {
       en: "Protect X-ray and CT images from tampering",
     },
     heroSubtitle: {
-      uz: "MedSeal — tibbiy suratlar va ularni o'qiydigan sun'iy intellekt uchun raqamli muhr va antivirus. Surat asl ekanini va AI aldanmaganini isbotlaymiz.",
-      ru: "MedSeal — цифровая печать и антивирус для медицинских снимков и AI, который их читает. Доказываем подлинность снимка и то, что AI нельзя обмануть.",
-      en: "MedSeal is a digital seal and antivirus for medical images and the AI that reads them. We prove an image is authentic and that the AI can't be fooled.",
+      uz: "MedSeal — tibbiy suratlar va ularni o'qiydigan sun'iy intellekt uchun raqamli muhr va antivirus. Surat asligini tasdiqlaymiz va AI qanchalik osson aldana olishini o'lchaymiz; bu klinik qaror emas.",
+      ru: "MedSeal — цифровая печать и антивирус для медицинских снимков и AI, который их читает. Подтверждаем подлинность снимка и измеряем, насколько легко обмануть AI; это не клиническое разрешение.",
+      en: "MedSeal is a digital seal and antivirus for medical images and the AI that reads them. We verify image integrity and measure how easily the AI can be fooled; this is not a clinical clearance.",
     },
     ctaPrimary: { uz: "Suratni muhrlash", ru: "Запечатать снимок", en: "Seal an image" },
     ctaSecondary: { uz: "Suratni tekshirish", ru: "Проверить снимок", en: "Verify an image" },
@@ -65,9 +65,9 @@ const dictionary = {
     },
     stepLabel: { uz: "Qadam", ru: "Шаг", en: "Step" },
     disclaimer: {
-      uz: "Muhr — matematik jihatdan aniq natija. Detektiv va Qalqon esa faqat ehtimollikni ko'rsatadi. Yakuniy qarorni har doim shifokor qabul qiladi.",
-      ru: "Печать — математически точный результат. Детектив и Щит показывают только вероятность. Итоговое решение всегда принимает врач.",
-      en: "The seal gives a mathematically certain answer. The detective and the shield only show a probability. The final decision is always the doctor's.",
+      uz: "Muhr sur'at butunligini tekshiradi. Detektiv va Qalqon ehtimollik va ogohlantirish beradi. Yakuniy klinik qarorni shifokor qabul qiladi.",
+      ru: "Печать проверяет целостность снимка. Детектив и щит дают вероятностные предупреждения. Окончательное клиническое решение принимает врач.",
+      en: "The seal checks image integrity. The detective and shield provide probabilistic warnings. A clinician makes the final decision.",
     },
     footerTagline: {
       uz: "Tibbiy suratlar va tibbiy AI uchun muhr va antivirus.",
@@ -187,7 +187,7 @@ const dictionary = {
     mockMode: {
       uz: "Demo rejim: backend ulanmagan, natijalar namunaviy.",
       ru: "Демо-режим: бэкенд не подключён, результаты примерные.",
-      en: "Demo mode: backend not connected, results are sample data.",
+      en: "Demo mode: backend is not connected; results are sample data.",
     },
   },
   a11y: {
@@ -431,6 +431,14 @@ const dictionary = {
           en: "The ledger record doesn't match its signature — it was edited without the key.",
         },
       },
+      authenticWithAttack: {
+        title: { uz: "Asl manba, lekin yashirin hujum gumon qilinadi", ru: "Подлинное происхождение, но предполагается скрытая атака", en: "Authentic origin, but a hidden attack is suspected" },
+        desc: {
+          uz: "Muhr tasdiqlangan, ammo qlalqon tasvirda yashirin hujumni gumon qiladi. Klinik qaror uchun bu ogohlantirishni hisobga oling.",
+          ru: "Печать подтверждена, но щит подозревает скрытую атаку на изображении. Учитывайте это предупреждение при клиническом решении.",
+          en: "The seal is valid, but the shield suspects a hidden attack on the image. Treat this as a warning before any clinical decision.",
+        },
+      },
     },
     changedTiles: { uz: "O'zgargan bo'laklar", ru: "Изменённых фрагментов", en: "Changed tiles" },
     device: { uz: "Qurilma", ru: "Устройство", en: "Device" },
@@ -491,7 +499,13 @@ const dictionary = {
         en: "The image's seal ID is missing — likely from being re-saved. The original sealed image was found by content and confirmed identical.",
       },
     },
-    heatmap: { uz: "Issiqlik xaritasi", ru: "Тепловая карта", en: "Heatmap" },
+    aiNote: {
+      not_applicable: {
+        uz: "Bu tasvir AI shield va detektivining tasdiqlangan domeniga kirmaydi; ular ishga tushirilmadi.",
+        ru: "Этот снимок не входит в подтверждённую область AI-щита и детектива; они не запускались.",
+        en: "This image is outside the validated domain of the AI shield and detective; they were not run.",
+      },
+    },
     shieldTitle: { uz: "AI qalqon", ru: "AI-щит", en: "AI shield" },
     shieldClean: { uz: "Yashirin hujum aniqlanmadi", ru: "Скрытая атака не обнаружена", en: "No hidden attack detected" },
     shieldFlag: { uz: "Yashirin hujum aniqlandi", ru: "Обнаружена скрытая атака", en: "Hidden attack detected" },
@@ -565,16 +579,15 @@ const dictionary = {
     intendedUse: { uz: "Maqsad", ru: "Назначение", en: "Intended use" },
     robustness: { uz: "Mustahkamlik bahosi", ru: "Оценка устойчивости", en: "Robustness score" },
     shieldCompatible: { uz: "AI qalqon bilan mos", ru: "Совместима с AI-щитом", en: "Compatible with AI shield" },
-    pipelineProtected: {
-      uz: "Suratlar oqimi muhrlangan",
-      ru: "Поток снимков защищён печатью",
-      en: "Image pipeline sealed",
-    },
+    activeDevices: { uz: "Faol qurilmalar", ru: "Активные устройства", en: "Active devices" },
+    sealsCount: { uz: "Muhrlangan suratlar", ru: "Запечатанные снимки", en: "Sealed images" },
+    ledgerIntegrity: { uz: "Reyestr butunligi", ru: "Целостность реестра", en: "Ledger integrity" },
     verdict: { uz: "Xulosa", ru: "Вердикт", en: "Verdict" },
+    verdictLabel: { uz: "Ustuvorlik baholashi", ru: "Оценка устойчивости", en: "Robustness assessment" },
     verdicts: {
-      allowed: { uz: "Ruxsat etiladi", ru: "Допускается", en: "Allowed" },
-      allowed_with_conditions: { uz: "Shartli ruxsat", ru: "Допускается с условиями", en: "Allowed with conditions" },
-      not_allowed: { uz: "Ruxsat etilmaydi", ru: "Не допускается", en: "Not allowed" },
+      allowed: { uz: "Tadqiqot chegarasiga mos", ru: "Соответствует исследовательскому порогу", en: "Meets the research threshold" },
+      allowed_with_conditions: { uz: "Shartlar bilan oʻrganish chegarasida", ru: "Исследовательский порог с условиями", en: "Research threshold with conditions" },
+      not_allowed: { uz: "Tadqiqot chegarasiga yetmagan", ru: "Не достигает исследовательского порога", en: "Below the research threshold" },
     },
     conditions: { uz: "Shartlar", ru: "Условия", en: "Conditions" },
     conditionTexts: {
@@ -600,9 +613,9 @@ const dictionary = {
       },
     },
     rule: {
-      uz: "Qoida: baho ≥ {allow} — ruxsat; baho < {allow} va qalqon mos — shartli ruxsat; aks holda — ruxsat yo'q.",
-      ru: "Правило: оценка ≥ {allow} — допускается; < {allow} и щит совместим — с условиями; иначе — не допускается.",
-      en: "Rule: score ≥ {allow} — allowed; < {allow} with a compatible shield — with conditions; otherwise not allowed.",
+      uz: "Bu — tadqiqot ustaxoriyati baholashi, klinik ruxsat yoki tibbiy qaror emas. Qoida: baho ≥ {allow} va klinik validatsiya mavjud bo'lsa — oʻrganish chegarasiga mos; aks holda shartlar qoʻshiladi.",
+      ru: "Это оценка исследовательской устойчивости, а не клиническое разрешение или медицинское решение. Правило: оценка ≥ {allow} и есть клиническая валидация — исследовательский порог пройден; иначе добавляются условия.",
+      en: "This is a research robustness assessment, not a clinical clearance or medical decision. Rule: score ≥ {allow} with clinical validation meets the research threshold; otherwise conditions apply.",
     },
     shieldDetection: {
       uz: "Qalqon PGD hujumini aniqlaydi (eps = 1 px)",
@@ -633,6 +646,7 @@ const dictionary = {
     verified: { uz: "Tekshirilgan", ru: "Проверено", en: "Verified" },
     tampered: { uz: "O'zgartirilgan", ru: "Изменено", en: "Tampered" },
     unsigned: { uz: "Muhrsiz", ru: "Без печати", en: "Unsigned" },
+    forged: { uz: "Soxta", ru: "Подделка", en: "Forged" },
     modelsTested: { uz: "Sinalgan modellar", ru: "Моделей протестировано", en: "Models tested" },
     avgRobustness: { uz: "O'rtacha mustahkamlik", ru: "Средняя устойчивость", en: "Average robustness" },
   },
