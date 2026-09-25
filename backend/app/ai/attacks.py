@@ -32,8 +32,14 @@ def fgsm(x: torch.Tensor, eps_px: float, pathology: str = "Pneumonia") -> torch.
     return x_adv.clamp(LO, HI).detach()
 
 
-def pgd(x: torch.Tensor, eps_px: float, pathology: str = "Pneumonia", steps: int = 10) -> torch.Tensor:
-    """`steps` FGSM steps of size eps/4, projected back into the L-inf eps-ball around x."""
+def pgd(
+    x: torch.Tensor, eps_px: float, pathology: str = "Pneumonia", steps: int = 10, stop_when_flipped: bool = False
+) -> torch.Tensor:
+    """`steps` FGSM steps of size eps/4, projected back into the L-inf eps-ball around x.
+
+    stop_when_flipped: end early once every image in the batch crossed the threshold
+    (the crash test only needs to know whether a flip happens; saves most steps at large eps).
+    """
     idx = pathology_index(pathology)
     eps = eps_px * PX_TO_NORM
     direction = _direction(x, idx)
@@ -41,6 +47,8 @@ def pgd(x: torch.Tensor, eps_px: float, pathology: str = "Pneumonia", steps: int
     for _ in range(steps):
         x_adv = x_adv + direction * (eps / 4) * _grad(x_adv, idx).sign()
         x_adv = torch.max(torch.min(x_adv, x + eps), x - eps).clamp(LO, HI).detach()
+        if stop_when_flipped and bool((_direction(x_adv, idx) != direction).all()):
+            break
     return x_adv
 
 

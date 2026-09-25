@@ -4,3 +4,4 @@
 torch>=2.5
 torchvision>=0.20
 torchxrayvision>=1.3
+pyarrow  # scripts/fetch_dataset.py

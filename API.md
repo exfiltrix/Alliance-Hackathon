@@ -50,16 +50,36 @@ Device: `{id, name, hospital, public_key_hex, revoked, created_at}`
 - `detective` key is present only when `status == "unsigned"`. `detective` and `shield` are `null` until the AI modules are connected — the UI must handle `null`.
 - UI labels: `authentic`/`tampered`/`forged` are certain ("Tasdiqlangan"); `detective` and `shield` are probabilities ("Ehtimollik 87%").
 
+## Models
+`GET /models` → `[{id, name, version, source, intended_use}]` — the built-in torchxrayvision DenseNet is created on startup; it is the only model that can be crash-tested.
+
 ## Crash test
-`POST /crash-test` — `{model_id, n_images: 50, eps: [0.5,1,2,4], method: "fgsm" | "pgd"}` → `{job_id}`
-`GET /crash-test/{job_id}`
+`POST /crash-test` — `{model_id, n_images: 50, eps: [0.5,1,2,4], method: "fgsm" | "pgd"}` → `202 {job_id}`
+- Defaults as shown; `n_images` 1–200, each eps in (0, 16] pixel units. Errors: 404 unknown model, 400 not the built-in model, 422 bad input, 503 AI modules not installed.
+- One job runs at a time; 50 images with PGD take ~40 s on a laptop CPU. Poll `GET /crash-test/{job_id}` every ~1 s.
+
+`GET /crash-test/{job_id}` while running:
 ```json
-{ "status": "running | done", "progress": 0.6,
-  "flip_rate": {"0.5": 0.12, "1": 0.48, "2": 0.9, "4": 1.0},
-  "psnr": {"1": 52.1},
-  "example": { "before_png": "…", "after_png": "…", "before_score": 0.08, "after_score": 0.93 },
-  "robustness_score": 5.2 }
+{ "job_id": 3, "model_id": 1, "created_at": "2026-09-25T10:00:00Z",
+  "status": "queued | running | error", "progress": 0.6, "error": "only when status = error" }
 ```
+when done:
+```json
+{ "job_id": 3, "model_id": 1, "created_at": "…", "status": "done", "progress": 1.0,
+  "n_images": 50, "method": "pgd", "pathology": "Pneumonia",
+  "eps": [0.5, 1, 2, 4],
+  "flip_rate": {"0.5": 0.96, "1": 1.0, "2": 1.0, "4": 1.0},
+  "psnr": {"0.5": 57.5, "1": 56.0, "2": 52.6, "4": 48.1},
+  "example": { "eps": 1, "before_png": "base64…", "after_png": "…", "before_score": 0.08, "after_score": 0.93 },
+  "robustness_score": 0.0,
+  "duration_s": 41.6 }
+```
+- `eps` always contains `1` (added if missing): the score is `round(10 × (1 − flip_rate["1"]), 1)`.
+- `flip_rate` / `psnr` keys are eps formatted without trailing zeros (`"0.5"`, `"1"`, `"2"`). PSNR in dB: > 40 means the noise is invisible to the eye.
+- Images are ones the model reads as healthy; a "flip" = the attack pushed the Pneumonia score above 0.5.
+- A job interrupted by a server restart returns `status: "error"`.
+
+`GET /crash-tests?model_id=1` → finished tests, newest first, same fields as "done" but without `example`.
 
 ## Passport
 `POST /passport` — `{model_id, crash_test_id}` → passport JSON

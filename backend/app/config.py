@@ -23,6 +23,8 @@ class Settings:
         ).split(",")
     )
     max_upload_bytes: int = 50 * 1024 * 1024
+    # Public/synthetic images (scripts/fetch_*.py). Crash test reads data/xray/normal, then data/samples.
+    data_dir: Path = _path("MEDSEAL_DATA_DIR", BACKEND_DIR.parent / "data")
 
 
 settings = Settings()

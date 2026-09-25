@@ -3,14 +3,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import db
 from app.config import settings
 from app.db import init_engine
-from app.routers import devices, seal, stats, verify
+from app.routers import crash_test, devices, seal, stats, verify
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_engine()
+    with db.SessionLocal() as session:
+        crash_test.seed_models(session)
     yield
 
 
@@ -23,7 +26,7 @@ app.add_middleware(
     expose_headers=["Content-Disposition"],
 )
 
-for r in (devices.router, seal.router, verify.router, stats.router):
+for r in (devices.router, seal.router, verify.router, crash_test.router, stats.router):
     app.include_router(r, prefix="/api")
 
 
