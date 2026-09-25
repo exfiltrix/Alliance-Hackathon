@@ -18,10 +18,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Аутентификация записи (harden v2, P0-1):** `POST /devices` и `/devices/{id}/revoke` требуют `Authorization: Bearer <MEDSEAL_ADMIN_TOKEN>`. `POST /seal` требует `Authorization: Bearer <device token>` — устройство определяется по токену, поля `device_id` в форме больше нет. Токен устройства выдаётся один раз при создании (`POST /devices` возвращает `token` в ответе), хранится только его sha256 (`devices.token_hash`, см. `app/auth.py`). Демо-устройство создаётся напрямую в БД без HTTP: `python -m scripts.create_demo_device`. Фронтенд никогда не хранит токен в `NEXT_PUBLIC_*` — печать идёт через серверный роут `by_billy/frontend/src/app/api/seal/route.ts`, который берёт токен из `MEDSEAL_DEVICE_TOKEN` (`.env.local`, только на сервере Next.js).
 - **P1-01 (audit remediation):** страница `/seal` и роуты `/api/seal`, `/api/crash-test`, `/api/passport` дополнительно закрыты HTTP Basic Auth на уровне Next.js: `by_billy/frontend/src/proxy.ts` (Proxy — так в Next 16 называется бывший Middleware, работает на Node.js runtime по умолчанию) перехватывает запрос первым, каждый route handler проверяет ещё раз (`src/lib/gatewayAuth.ts`). Креды — `MEDSEAL_GATEWAY_USER`/`MEDSEAL_GATEWAY_PASSWORD` в `.env.local`; без них — `503` (fail closed). `/api/seal` также отклоняет тела > 50 МБ (`413`) по заголовку `Content-Length`, до чтения тела.
 - Паспорт (`app/passport/`) не зависит от torch: читает строку краш-теста и `shield_calibration.json`. Вердикт — детерминированные правила в `report.decide()` (оценка ≥ 7 → разрешено; < 7 и щит совместим → с условиями; иначе нет). Паспорт замораживается при выдаче (`report_json`). PDF — fpdf2 + DejaVu Sans из `app/passport/fonts/` (кириллица и узбекская латиница); тексты PDF в `app/passport/i18n.py`.
-- Frontend лежит в `by_billy/frontend/` (Next.js 16, второй разработчик), а не в `frontend/`. Подключён к реальному API: типы в `src/lib/types.ts` сверены с корневым `API.md` (`by_billy/docs/API.md` — устаревшая копия). Без `NEXT_PUBLIC_API_URL` в `.env.local` работает на демо-данных `src/lib/mock.ts` — при смене типов обновлять и моки, иначе `npm run build` упадёт. Все строки UI — `src/lib/dictionary.ts` (uz/ru/en).
+- Frontend лежит в `by_billy/frontend/` (Next.js 16, второй разработчик), а не в `frontend/`. Подключён к реальному API: типы в `src/lib/types.ts` сверены с корневым `API.md`. Mock-данные включаются только явно через `NEXT_PUBLIC_USE_MOCK=1`; при смене типов обновлять и моки, иначе `npm run build` упадёт. Все строки UI — `src/lib/dictionary.ts` (uz/ru/en).
 - Тепловая карта детектива во фронтенде не показывается: она построена по центральному квадрату 224×224 и на тестах попадает на подделку лишь в 4,8% случаев.
 - Документы лежат **в корне** (`SPEC.md`, `ARCHITECTURE.md`, `API.md`, `TASKS.md`, `DEMO.md`), хотя в них упоминается путь `docs/…`.
 - `reference/medseal_poc.py` извлечён из `muhr.zip`; остальное содержимое архива дублирует файлы в корне.
+- **Аудит-ремедиация (ветка `fix/audit-2026-09`, см. `AUDIT_REMEDIATION_STATUS.md` за точным статусом на конкретный коммит):**
+  - **Подпись v2 и сертификаты устройств (CRY-01/CRY-02):** новые печати подписываются каноническим v2-заголовком (`uid`, `device_id`, `created_at`, `meta_hash`, `patient_ref` — редактирование любого из них без ключа теперь сразу даёт `bad_signature`, а не только рассинхронизацию цепочки). Старые (`sig_version=1`) записи по-прежнему проверяются старым сообщением `root + meta_hash + uid` — формат тайлов/Меркла (`GOLDEN_ROOT`) не менялся и не может меняться. Корневой ключ (`scripts/create_root_key.py`) подписывает сертификат каждого устройства; запись без действительного сертификата — `forged`/`untrusted_device`. `MEDSEAL_REQUIRE_DEVICE_CERT=0` — режим миграции старых БД (предупреждение `device_not_certified` вместо отказа).
+  - **Внешние якоря реестра (CRY-03):** после каждой печати в `MEDSEAL_ANCHOR_PATH` (`backend/anchors/anchors.jsonl`, в .gitignore) дописывается fsync'нутая, подписанная корнем строка `{n, head_hash, at, sig}`. `/ledger/check` проверяет и её тоже (`anchors_checked`, `anchor_mismatch`) — полная переписанная-и-пересчитанная цепочка внутри одной БД теперь обнаруживается.
+  - **Восстановление печати по содержимому (P1-03):** если `uid` отсутствует/не найден, `verify/recovery.py` ищет кандидатов по перцептивному хешу (`dhash_hex`, не входит в `record_bytes()`) и подтверждает совпадением ≥50% тайлов. Печать без ID, производная от уже запечатанного снимка, отклоняется (`409`) при попытке запечатать заново.
+  - **Привязка пациента (CRY-01):** `patient_ref = HMAC-SHA256(MEDSEAL_PATIENT_SALT, PatientID)` в подписи; расхождение при проверке — `tampered`/`patient_mismatch`, даже если пиксели не тронуты.
+  - **Безопасность API (Фаза 2):** `GET /seal/{id}/file` и `GET /seals` теперь требуют токен устройства или админский; краш-тест работает на одном выделенном воркере (`ThreadPoolExecutor(max_workers=1)`), второй запрос во время выполнения — `409`; загрузка/печать/проверка идут через `run_in_threadpool`, `detective.check`/`shield.check` защищены `threading.Lock`; `ledger.append` — под процесс-локальным локом с одной повторной попыткой при `IntegrityError`; `MEDSEAL_MAX_PIXELS` (по умолчанию 40 000 000) проверяется по заголовку до декодирования пикселей.
+  - **Снимки/DICOM (Фаза 3):** превью, щит и детектив видят `imaging.display_pixels()` (Modality LUT, VOI LUT, инверсия `MONOCHROME1`) — печать и `changed_tiles` всегда хешируют «сырой» массив. Деидентификация рекурсивно удаляет все элементы VR `PN` и расширенный список тегов, но **сохраняет все UID** (иначе печать сломается) — осознанное отклонение от DICOM PS3.15. `META_TAGS_V2` подписывает больше полей, включая оверлеи (группы `0x60xx`); ИИ не запускается вне `CR`/`DX` (`ai_note: "not_applicable"`).
+  - **Честность паспорта (Фаза 5):** правило `shield.compatible` использует точечные оценки (порог 90%/2%), но паспорт и PDF показывают и 95%-й доверительный интервал (Клоппер–Пирсон), и `adaptive_attack_tested: false` — граница по интервалам сознательно не применяется при текущем размере калибровки (см. `ARCHITECTURE.md`). `allowed` недостижим без непустого `clinical_validation`; без него потолок — `allowed_with_conditions` + условие `clinical_validation_required`.
 
 ## Что делает продукт
 
@@ -69,15 +77,21 @@ reference/medseal_poc.py
 
 ```bash
 # backend (venv в backend/.venv, Python 3.14)
-cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
-export MEDSEAL_ADMIN_TOKEN=dev-admin-token   # без него POST /devices и /revoke всегда 401
+cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt   # requirements.txt = только рантайм
+export MEDSEAL_ADMIN_TOKEN=dev-admin-token   # без него POST /devices, /revoke, /crash-test, /passport всегда 401
 .venv/bin/uvicorn app.main:app --reload --port 8000   # Swagger: http://localhost:8000/docs
-.venv/bin/pytest
+.venv/bin/pytest -m "not ai"   # быстрый гейт
+.venv/bin/pytest               # полный набор; ИИ-тесты без torch — SKIPPED, не PASSED
 .venv/bin/pytest tests/test_seal_core.py::test_one_pixel_change   # один тест
+.venv/bin/python -m scripts.demo_smoke   # сквозной smoke-тест на временных БД/ключах/хранилище/якорях
 # пути БД/ключей/хранилища переопределяются через MEDSEAL_DB_URL, MEDSEAL_KEYS_DIR, MEDSEAL_STORAGE_DIR
 
-# демо-устройство шлюза (нужно один раз — печатает токен, вставить в frontend/.env.local)
-.venv/bin/python -m scripts.create_demo_device
+# первый запуск: корневой ключ → устройство с сертификатом (в этом порядке, один раз)
+.venv/bin/python -m scripts.create_root_key      # backend/keys/root.{pem,pub} — не перезаписывает существующий
+.venv/bin/python -m scripts.create_demo_device   # печатает токен устройства, вставить в frontend/.env.local
+# миграция БД с печатями до CRY-02 (устройства без сертификата): создать root-ключ выше, затем
+export MEDSEAL_ADMIN_TOKEN=dev-admin-token
+.venv/bin/python -m scripts.certify_devices --authorization "Bearer $MEDSEAL_ADMIN_TOKEN"
 
 # AI (torch CPU; работает на 3.14). Веса DenseNet кешируются в ~/.torchxrayvision
 .venv/bin/pip install -r requirements-ai.txt --extra-index-url https://download.pytorch.org/whl/cpu
@@ -93,6 +107,8 @@ export MEDSEAL_ADMIN_TOKEN=dev-admin-token   # без него POST /devices и 
 
 # frontend (by_billy/frontend)
 cd by_billy/frontend && npm install && cp .env.example .env.local && npm run dev   # http://localhost:3000
+# .env.local: MEDSEAL_DEVICE_TOKEN (из create_demo_device), MEDSEAL_ADMIN_TOKEN (= MEDSEAL_ADMIN_TOKEN
+# на бэкенде), MEDSEAL_GATEWAY_USER/PASSWORD (Basic Auth перед /seal и его API-роутами — без них 503)
 npm run build && npm run lint                       # проверка типов и линтер
 # доступ с других устройств в Wi-Fi: backend с --host 0.0.0.0, .env.local остаётся localhost:8000 —
 # api.ts сам подставляет хост, с которого открыт сайт; CORS пускает любые частные IP:3000; после смены сети перезапустить npm run dev
@@ -107,12 +123,14 @@ python reference/medseal_poc.py
 
 - Вход хеша тайла: `f"{uid}|{y}|{x}|{shape}|{dtype}"` (где `shape`/`dtype` — от самого тайла, краевые тайлы меньше) + сырые байты тайла (`np.ascontiguousarray(...).tobytes()`). Формат не менять без обновления тестов и повторной печати демо-данных.
 - Размер тайла: 32×32 для снимков ≥ 256 px, 16×16 для меньших. Пиксели — в градациях серого с сохранением исходного dtype (int16 у КТ — не приводить к uint8).
-- Меркл: листья сортируются по `(y, x)`, на нечётном уровне дублируется последний узел. Подписывается `root + uid.encode()`.
-- `uid` = DICOM `SOPInstanceUID`; для PNG генерируется UUID и записывается в tEXt-чанк `medseal_uid` (пиксели не меняются).
-- Реестр — hash-chain: каждая запись хранит `prev_hash` и `entry_hash = sha256(prev_hash + record)`.
+- Меркл: листья сортируются по `(y, x)`, на нечётном уровне дублируется последний узел. **Формат тайлов/Меркла заморожен** (`GOLDEN_ROOT`) — новое всегда идёт в новые версионные поля, никогда внутрь `tile_hashes()`/`merkle_root()`.
+- `uid` = DICOM `SOPInstanceUID`; для PNG генерируется UUID и записывается в tEXt-чанк `medseal_uid` (пиксели не меняются). Если `uid` отсутствует/не найден — восстановление по содержимому через `dhash_hex` + ≥50% совпадение тайлов (P1-03, `ARCHITECTURE.md` §1b), `dhash_hex` не входит в `record_bytes()`.
+- Подпись: новые печати — v2 (`sig_version=2`, канонический заголовок с `uid`/`device_id`/`created_at`/`meta_hash`/`patient_ref`); старые (`sig_version=1`) — заморожённое сообщение `root + meta_hash + uid`, проверяются как раньше. Устройство должно иметь действительный сертификат от корневого ключа (`ARCHITECTURE.md` §1d), иначе `forged`/`untrusted_device` (или предупреждение `device_not_certified` при `MEDSEAL_REQUIRE_DEVICE_CERT=0`).
+- Реестр — hash-chain: каждая запись хранит `prev_hash` и `entry_hash = sha256(prev_hash + record)`; дополнительно после каждой печати — подписанный корнем внешний якорь в `MEDSEAL_ANCHOR_PATH` (`ARCHITECTURE.md` §1c), защищающий от переписанной-и-пересчитанной цепочки внутри БД.
 - `tests/test_seal_core.py::test_hash_format_is_frozen` фиксирует формат хеша эталонным значением, посчитанным функциями из `reference/medseal_poc.py`. Падает — значит сломан формат.
-- Порядок статусов при проверке: нет записи по `uid` → `unsigned` (запустить детектива); подпись или пересчёт корня из листьев не сходятся → `forged` (проверка: целостность строки реестра → отзыв устройства → подпись + корень Меркла; причина отдаётся в поле `reason`); иначе есть несовпавшие тайлы → `tampered`; иначе `authentic`.
-- Приватные ключи не покидают модуль `seal/`, никогда не логируются и не возвращаются API. Публичные ключи — в таблице `devices`.
+- Порядок статусов при проверке: нет записи по `uid` и по содержимому → `unsigned` (запустить детектива); сертификат устройства недействителен / подпись / целостность строки реестра / отзыв устройства не сходятся → `forged` (причина — в поле `reason`: `untrusted_device` / `bad_signature` / `ledger_entry_modified` / `device_revoked` / `unknown_device`); есть несовпавшие тайлы, изменены подписанные метаданные (`meta_hash`, `META_TAGS_V2`) или не совпал `patient_ref` → `tampered` (`reason`: `metadata_changed` / `seal_id_removed` / `patient_mismatch`); иначе `authentic` (возможно с `warning`: `device_revoked_later` / `seal_id_missing` / `device_not_certified`).
+- Приватные ключи не покидают модуль `seal/`, никогда не логируются и не возвращаются API. Публичные ключи и `cert_sig_hex` — в таблице `devices`. Корневой ключ (`MEDSEAL_ROOT_KEY_PATH`, по умолчанию `backend/keys/root.pem`) подписывает и сертификаты устройств, и якоря реестра, и паспорта — верификатору достаточно `root.pub`.
+- Новые переменные окружения бэкенда (все опциональны, см. `README.md` за полным списком с описаниями): `MEDSEAL_PATIENT_SALT`, `MEDSEAL_ROOT_KEY_PATH`/`MEDSEAL_ROOT_PUBKEY_PATH`, `MEDSEAL_REQUIRE_DEVICE_CERT`, `MEDSEAL_ANCHOR_PATH`, `MEDSEAL_MAX_PIXELS`.
 
 **ИИ-модули:**
 

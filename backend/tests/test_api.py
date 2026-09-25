@@ -121,7 +121,7 @@ def test_v1_seal_still_verifies_with_its_original_message_format(client, device)
     """CRY-01: `sig_version` defaults to 1 for rows written before this migration, and those
     rows must keep verifying with the pre-v2 message (root + meta_hash + uid), not the new
     canonical v2 header. Builds a genuine pre-migration row with the frozen `core.seal()` (the
-    same function `reference/muhr_poc.py`/pre-CRY-01 code used) instead of the current
+    same function `reference/medseal_poc.py`/pre-CRY-01 code used) instead of the current
     `signing.sign_v2()` path, so this exercises the `(row.sig_version or 1) < 2` branch in
     `verify/service.py::_check_row` that no other test reaches."""
     import uuid

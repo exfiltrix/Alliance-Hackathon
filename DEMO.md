@@ -4,13 +4,20 @@
 "A healthy person was told they have cancer — because of one fake image. In 2026 the journal *Radiology* showed: when not warned, only 41% of radiologists noticed AI-generated X-rays."
 
 ## 1. Seal (30 s)
-Open `/seal` → upload a real chest X-ray → "Muhrlandi" + seal ID.
-Say: "In a hospital this happens automatically next to the scanner."
+Open `/seal` → the browser asks for the gateway's Basic Auth credentials first (enter them once
+before the demo, or have them ready — this is the whole point of the next line) → upload a real
+chest X-ray → "Muhrlandi" + seal ID.
+Say: "In a hospital this login prompt doesn't exist — sealing happens automatically on a box next
+to the scanner. Here it stands in for that box, so only the gateway can seal."
 
 ## 2. Spot the fake (40 s)
 Show two images side by side, ask the jury: "Which one is fake?"
-Upload the fake to `/verify` → red banner + red boxes exactly where the nodule was added.
-Then upload the original → green "Tasdiqlangan".
+Upload the fake to `/verify` → red "O'zgartirilgan" banner + red/white boxes exactly where the
+nodule was added.
+Then upload the original → green "Tasdiqlangan" ("authentic").
+Optional third beat if there's time: upload a chest X-ray that was never sealed → amber
+"Tasdiqlanmagan" ("unconfirmed") — say the two words on stage sound similar in Uzbek/Russian on
+purpose; the colour (green vs amber) is what the jury should read, not the word.
 
 ## 3. Attack on the AI (40 s)
 Open `/crash-test` → before/after: healthy X-ray, AI says ~8% pneumonia → after invisible noise ~93%.
@@ -18,6 +25,9 @@ Show the shield on `/verify`: "Yashirin hujum aniqlandi".
 
 ## 4. Passport (20 s)
 Open the model's passport: robustness score, verdict, PDF.
+Say: "A passport can only be issued from a crash test that ran the full protocol — PGD, at least
+50 images, eps=1 included — never a quick FGSM run on a handful of images. The shield's detection
+and false-alarm rates are shown with their 95% confidence interval, not just a single number."
 Say: "This is the standard task №6 asks for: every AI model gets a passport before it touches patients."
 
 ## 5. Close (30 s)

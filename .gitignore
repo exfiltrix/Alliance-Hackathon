@@ -5,14 +5,17 @@ data/
 backend/.venv/
 backend/keys/
 backend/storage/
+backend/run_keys/
+backend/run_storage/
+backend/anchors/
 backend/*.db
 backend/weights/
 __pycache__/
 .pytest_cache/
 
 # frontend
-frontend/node_modules/
-frontend/.next/
+by_billy/frontend/node_modules/
+by_billy/frontend/.next/
 
 .DS_Store
 .env*

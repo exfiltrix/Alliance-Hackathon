@@ -47,11 +47,11 @@ those routes refuse every request with `503` (fail closed, never open). Wrong cr
 via the `Content-Length` header before the body is read. This protects the Next.js layer; `POST /seal` on the
 Python backend still separately requires the device bearer token (P0-1) regardless.
 
-`GET /seal/{id}/file` — sealed file to download: DICOM with patient tags removed (pixels unchanged) / PNG with `medseal_uid` chunk (pixels unchanged).
+`GET /seal/{id}/file` — sealed file to download: DICOM with patient tags removed (pixels unchanged) / PNG with `medseal_uid` chunk (pixels unchanged). **SEC-01:** requires a device bearer token *or* the admin token (`401` without one); the frontend's own `/api/seal/[id]/file` route handler forwards the device token server-side.
 **For the demo, verify the downloaded file** — a PNG that never went through `/seal` has no `medseal_uid` and is always `unsigned`.
 
-`GET /seals?limit=50` — latest seals (same shape as the `POST /seal` response, without `seal_ms`).
-`GET /ledger/check` → `{ "ok": true, "entries": 12, "broken": [] }` — walks the hash chain; `broken` lists rewritten ledger rows.
+`GET /seals?limit=50` — latest seals (same shape as the `POST /seal` response, without `seal_ms`). **SEC-01:** same auth as the file download above (`401` without a device or admin token) — sealed files were previously listable by anyone.
+`GET /ledger/check` (public — counts only) → `{ "ok": true, "entries": 12, "broken": [], "anchors_checked": 12, "anchor_mismatch": [] }` — walks the hash chain and (CRY-03) re-verifies every root-signed external anchor; `broken` lists rows whose stored content no longer matches their own `entry_hash`, `anchor_mismatch` lists row ids whose anchored `head_hash` no longer matches — this is what catches a full, internally-consistent chain rewrite that `broken` alone cannot.
 
 ## Verify
 `POST /verify` — form: `file`
@@ -61,15 +61,19 @@ Python backend still separately requires the device bearer token (P0-1) regardle
   "changed_tiles": [[64,16],[64,32]], "tile": 32,
   "matched_by": "uid | content | null",
   "warning": "device_revoked_later",
+  "patient_check": "matched | mismatch | not_available",
   "verify_ms": 1.1,
   "preview_png": "base64…",
   "detective": { "probability": 0.87, "experimental": true },
   "shield": { "attack_suspected": false, "score": 3.64, "threshold": 10.42 },
   "note": "Final decision is made by the doctor." }
 ```
-- `changed_tiles`: `[y, x]` of the top-left corner of each changed tile, in original image pixels; tile size is `tile`. `preview_png` already has red boxes drawn on them (preview is scaled down to max 1024 px).
+- `changed_tiles`: `[y, x]` of the top-left corner of each changed tile, in original image pixels; tile size is `tile`. `preview_png` already has red-outer/white-inner boxes drawn on them (visible in greyscale mode too; preview is scaled down to max 1024 px).
 - `unsigned`: `uid`, `device`, `seal_id`, `tile` are `null`.
-- `forged`: extra field `reason` = `ledger_entry_modified | bad_signature | device_revoked | unknown_device`; `changed_tiles` is empty (tiles are not compared against an untrusted record).
+- `forged`: extra field `reason` = `ledger_entry_modified | bad_signature | device_revoked | unknown_device | untrusted_device` (**CRY-02**: the device has no valid root-signed certificate — a forged device row or a swapped public key). `changed_tiles` is empty (tiles are not compared against an untrusted record).
+- **CRY-01 patient binding:** `patient_check` = `"matched"` (the upload's DICOM PatientID hashes to the same `patient_ref` the seal was made with), `"mismatch"` (an authentic-looking image attached to the wrong patient — the response is `status: "tampered", reason: "patient_mismatch"` even though every tile and pixel is untouched), or `"not_available"` (no PatientID on the upload, no `MEDSEAL_PATIENT_SALT` configured, or the row predates `sig_version` 2 and was never bound to a patient).
+- **CRY-02 migration:** `warning` can also be `"device_not_certified"` (only when `MEDSEAL_REQUIRE_DEVICE_CERT=0`; a seal from an as-yet-uncertified device that would otherwise be `untrusted_device`).
+- **IMG-05:** for a DICOM whose `Modality` is not `CR`/`DX` (e.g. a CT slice), `detective` and `shield` are both `null` and the response carries `"ai_note": "not_applicable"` — the bundled models are chest X-ray only and must not silently score images outside that domain.
 - `tampered` can also carry `reason: "metadata_changed"` + `changed_meta: [tag names]` when a display-affecting DICOM tag (RescaleSlope/Intercept, WindowCenter/Width, Laterality, PixelSpacing, ...) was edited without touching any pixel — those tags never touch tile hashes, so they are bound into the signature separately (P0-5).
 - `warning` (optional, on `authentic`/`tampered` only) = `device_revoked_later`: the device was revoked **after** this particular seal was made, so the seal itself is still trusted — revocation is not retroactive. A seal made at/after the device's `revoked_at` is `forged`/`device_revoked` instead, not a warning.
 - **P1-03 content-based recovery.** `matched_by` = `"uid"` (the normal case: the record was found by the image's own ID), `"content"` (the ID was missing, stripped or replaced — the record was found instead by comparing pixels against every previously sealed image of the same shape/dtype), or `null` (`unsigned` only — no match at all). On a `"content"` match: all tiles and metadata identical → `authentic` + `warning: "seal_id_missing"` (an untouched image whose ID chunk was dropped, e.g. by a re-save that strips PNG text chunks); anything different → `tampered` + `reason: "seal_id_removed"` + `changed_tiles` computed against the matched record. `POST /seal` also refuses (`409`) to seal an ID-less image that is a partial (not exact) content match of something already sealed — that would otherwise let an attacker strip the ID, edit the image, and get a brand-new "clean" seal for a forged derivative.
@@ -127,6 +131,7 @@ when done:
 
 `GET /passport/{id}` → passport JSON · `GET /passports?model_id=1` → summaries `[{id, created_at, organisation, verdict, conditions, model, robustness_score}]`, newest first
 `GET /passport/{id}/pdf?lang=uz|ru` → one-page A4 PDF (download; `Content-Disposition: attachment`). Default `uz`.
+`GET /passport/{id}/verify` (public) → `{"valid": bool, "fingerprint": "…"}` — see CRY-04 below.
 
 ```json
 { "id": 1, "created_at": "2026-09-25T06:33:20Z", "organisation": "Namangan viloyat shifoxonasi",
@@ -135,25 +140,68 @@ when done:
                   "n_images": 50, "method": "pgd", "pathology": "Pneumonia", "data": ["nih/normal"],
                   "flip_rate": {"0.5": 0.32, "1": 0.98, "2": 1.0, "4": 1.0}, "psnr": {"0.5": 54.7, "1": 50.0, "2": 47.9, "4": 45.0},
                   "example": { "eps": 1, "before_png": "base64…", "after_png": "base64…", "before_score": 0.07, "after_score": 0.78 } },
+  "clinical_validation": null,
   "shield": { "available": true, "compatible": true, "method": "median 3x3, L1 distance of DenseNet logits", "threshold": 10.419,
-              "false_positive_rate": 0.009, "detection_pgd_eps1": 1.0, "detection_fgsm_eps1": 0.619, "calibrated_on": "NIH ChestX-ray14 …" },
+              "false_positive_rate": 0.009, "detection_pgd_eps1": 1.0, "detection_fgsm_eps1": 0.619, "calibrated_on": "NIH ChestX-ray14 …",
+              "confidence_intervals": { "detection_pgd_eps1": { "successes": 29, "n": 29, "lower": 0.880555, "upper": 1.0 }, "false_positive_rate": { "successes": 4, "n": 450, "lower": 0.002427, "upper": 0.022602 } },
+              "adaptive_attack_tested": false },
   "pipeline": { "devices_active": 1, "seals": 12, "verifications": 30, "tampered_or_forged": 4, "ledger_ok": true },
   "verdict": "allowed_with_conditions",
-  "conditions": ["shield_required", "seal_required", "doctor_decides"],
+  "conditions": ["clinical_validation_required", "shield_required", "seal_required", "doctor_decides"],
   "rules": { "allow_score": 7.0, "shield_min_detection": 0.9, "shield_max_false_alarms": 0.02 },
   "protocol": { "method": "pgd", "min_images": 50, "eps_required": [1] },
+  "fingerprint": "a1b2c3d4e5f60718",
+  "verify_url": "/api/passport/1/verify",
   "note": "Final decision is made by the doctor." }
 ```
 - `verdict` is a research robustness assessment, not a regulatory or clinical permission. Codes remain `allowed` / `allowed_with_conditions` / `not_allowed` for API stability; display text must say what the measured thresholds mean. The current decision rules are built from `rules` and are not a clinical validation.
-- `shield.compatible` = catches ≥ 90% PGD attacks at eps 1 px with ≤ 2% false alarms. If the shield is not calibrated: `{"available": false, "compatible": false}` only.
+- `shield.compatible` = catches ≥ 90% PGD attacks at eps 1 px with ≤ 2% false alarms **(point estimate, decided under AI-01 — see `ARCHITECTURE.md`)**. `confidence_intervals` are shown next to it but do not gate `compatible`. If the shield is not calibrated: `{"available": false, "compatible": false}` only.
 - `conditions` are codes; texts go in the frontend dictionary (the PDF has the same texts in `backend/app/passport/i18n.py`):
+  - `clinical_validation_required` (**AI-02**) — `clinical_validation` is `null`; a research score alone cannot reach `allowed`, only `allowed_with_conditions` at best
   - `shield_required` — every image passes the MedSeal shield before the model
   - `seal_required` — images sealed at capture and verified before the model
   - `doctor_decides` — the model only advises; the doctor makes the diagnosis
   - `retest_required` — retrain the model against attacks and re-run the crash test
+- `clinical_validation`: `null`, or once populated, `{dataset, n, auc, sensitivity, specificity}`. **AI-02:** `allowed` is only reachable when this is non-null.
 - `robustness.example` may be `null` (older crash tests).
+- **CRY-04:** `fingerprint` (first 16 hex chars of the sha256 of the root-signed message) and `verify_url` are on every passport. `GET /passport/{id}/verify` → `{"valid": bool, "fingerprint": "…"}` — `valid: false` means the stored `report_json` no longer matches what was actually signed at issue time (e.g. edited directly in the database). Both the PDF and the passport page show the fingerprint and this path.
 
 ## Stats
 `GET /stats` → `{sealed, verified, authentic, tampered, unsigned, forged, models_tested, avg_robustness}` (`avg_robustness` is `null` until a crash test has run)
 
 `GET /health` → `{ "ok": true }`
+
+## Changed in audit remediation
+
+Everything below was added or changed against the pre-audit API; each item is also documented
+inline above, in context. Collected here as one changelog per HYG-04.
+
+**New auth requirements**
+- `GET /seal/{id}/file`, `GET /seals` — now require a device or admin bearer token (SEC-01).
+- `POST /crash-test`, `POST /passport` — now require the admin bearer token (P1-04).
+
+**New/changed fields on `POST /verify`**
+- `matched_by`: `"uid" | "content" | null` (P1-03).
+- `warning`: added `"seal_id_missing"`, `"device_not_certified"` (P1-03, CRY-02) alongside the
+  existing `"device_revoked_later"`.
+- `reason` (on `forged`): added `"untrusted_device"` (CRY-02).
+- `reason` (on `tampered`): added `"seal_id_removed"` (P1-03), `"patient_mismatch"` (CRY-01).
+- `patient_check`: `"matched" | "mismatch" | "not_available"`, new field (CRY-01).
+- `ai_note`: `"not_applicable"`, new field, `detective`/`shield` both `null` alongside it (IMG-05).
+- `phi_warning`: `"burned_in_annotation"`, new field on `POST /seal` and `POST /verify` (IMG-03).
+- `changed_meta`: list of changed metadata tag names alongside `reason: "metadata_changed"` (P0-5/IMG-04, tag set widened to `META_TAGS_V2` including DICOM overlay planes).
+- `detective.heatmap_png` removed from this public response (P1-05); `detective.experimental` is now always `true`.
+
+**`GET /ledger/check`**: response gained `anchors_checked`, `anchor_mismatch` (CRY-03); `ok`
+is now `false` if either the hash chain or an anchor fails.
+
+**`POST /passport` response / `GET /passport/{id}`**
+- `clinical_validation`: `null` or `{dataset, n, auc, sensitivity, specificity}`, new field; new
+  condition code `clinical_validation_required` (AI-02).
+- `shield.confidence_intervals`, `shield.adaptive_attack_tested`: new fields (AI-01).
+- `fingerprint`, `verify_url`: new fields; new endpoint `GET /passport/{id}/verify` (CRY-04).
+- `protocol_compliant` on crash-test results, and the `409` "does not meet the passport
+  protocol" refusal on `POST /passport`: new (P1-04).
+
+**Removed**: nothing was removed from the public surface except `detective.heatmap_png`
+(above) — every other change is additive.
