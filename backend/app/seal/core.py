@@ -19,8 +19,12 @@ def tile_size_for(shape: tuple[int, ...]) -> int:
 
 
 def tile_hashes(px: np.ndarray, uid: str, tile: int) -> Leaves:
-    """SHA-256 fingerprint of every tile, bound to image ID and tile position."""
-    h, w = px.shape
+    """SHA-256 fingerprint of every tile, bound to image ID and tile position.
+
+    px may be 2-D grayscale (h, w) or 3-D (h, w, channels) — RGB/RGBA PNGs are hashed with
+    every channel, not just luminance (P0-3), so a color-only edit is still caught.
+    """
+    h, w = px.shape[:2]
     out = {}
     for y in range(0, h, tile):
         for x in range(0, w, tile):
