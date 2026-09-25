@@ -29,3 +29,6 @@ contracts/coverage/
 
 # local chain log from demo.sh
 contracts/node.log
+
+# pitch / jury prep material — kept locally, not part of the submitted project
+/*.pdf

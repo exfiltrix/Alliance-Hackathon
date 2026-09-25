@@ -21,6 +21,14 @@ if git diff --cached -U0 -- . ':(exclude)*.example' ':(exclude)package-lock.json
 fi
 ok "no secrets"
 
+# --- data and junk: X-rays, DICOM, databases, model weights, archives, PDFs never go to the repo ---
+# (website images live in by_billy/frontend/public/ and are allowed)
+added=$(git diff --cached --name-only --diff-filter=A)
+junk=$(echo "$added" | grep -E -i '\.(png|jpe?g|dcm|dicom|nii|db|sqlite3?|pt|pth|onnx|npy|npz|zip|tar|gz|7z|pdf|pptx?|docx?|log)$|(^|/)(data|storage|weights|node_modules|\.next|__pycache__)/|\.DS_Store$' \
+  | grep -v -E '^by_billy/frontend/(public|src/app)/' || true)
+[ -n "$junk" ] && fail "data or junk files staged (not part of the project): $(echo "$junk" | head -5 | tr '\n' ' ')"
+ok "no data or junk files"
+
 # --- tests for what changed ---
 if echo "$staged" | grep -E '^(backend/|docs/SECURITY\.md|by_billy/frontend/src/lib/dictionary\.ts)' >/dev/null; then
   echo "▶ backend tests (fast, ~10 s)…"
