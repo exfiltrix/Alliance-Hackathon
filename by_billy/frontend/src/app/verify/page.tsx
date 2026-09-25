@@ -115,6 +115,9 @@ export default function VerifyPage() {
                   {result.status === "tampered" && (
                     <Field label={t(d.changedTiles)} value={result.changed_tiles.length} />
                   )}
+                  {result.status === "tampered" && result.reason === "metadata_changed" && (
+                    <Field label={t(d.metadataChanged)} value={(result.changed_meta ?? []).join(", ")} />
+                  )}
                 </Card>
               )}
 

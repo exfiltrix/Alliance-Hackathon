@@ -6,7 +6,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.imaging import LoadedImage, assign_uid, sealed_file_bytes
+from app.imaging import LoadedImage, assign_uid, meta_fields, meta_hash, sealed_file_bytes
 from app.models import Device, Seal
 from app.seal import core, keys, ledger
 
@@ -31,8 +31,10 @@ def seal_upload(session: Session, image: LoadedImage, device_id: int) -> tuple[S
         return existing, 0.0
 
     uid = assign_uid(image)
+    fields = meta_fields(image)
+    mh = meta_hash(fields)
     t0 = time.perf_counter()
-    record = core.seal(image.px, uid, keys.load_private_key(device.id))
+    record = core.seal(image.px, uid, keys.load_private_key(device.id), meta_hash=mh)
     elapsed_ms = (time.perf_counter() - t0) * 1000
 
     content, ext = sealed_file_bytes(image)
@@ -48,6 +50,8 @@ def seal_upload(session: Session, image: LoadedImage, device_id: int) -> tuple[S
         tile=record["tile"],
         leaves_json=ledger.leaves_to_json(record["leaves"]),
         root_hex=record["root"].hex(),
+        meta_hash_hex=mh.hex(),
+        meta_json=json.dumps(fields, sort_keys=True, separators=(",", ":")),
         sig_hex=record["sig"].hex(),
         file_name=file_name,
     )
