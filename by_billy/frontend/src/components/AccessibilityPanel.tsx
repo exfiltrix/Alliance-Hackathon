@@ -140,12 +140,11 @@ export default function AccessibilityPanel() {
         aria-haspopup="dialog"
         aria-label={t(d.open)}
         title={t(d.open)}
-        className={`flex h-9 items-center gap-2 rounded-full border px-2.5 text-sm font-medium transition-colors ${
+        className={`flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
           open ? "border-foreground bg-foreground text-white" : "border-border bg-white/70 hover:bg-white"
         }`}
       >
         <AccessibilityIcon width={18} height={18} />
-        <span className="hidden xl:inline">{t(d.open)}</span>
       </button>
 
       {open && (
