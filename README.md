@@ -90,10 +90,10 @@ Tests: `cd backend && .venv/bin/pytest` · `cd contracts && npx hardhat test` ·
 
 | Name | Role |
 |---|---|
-| Мирмахмудов Фаррух | Backend developer |
-| Нормирзаев Билолиддин | Frontend developer |
-| Акрамов Дониёр | Designer |
-| Саидазимов Эмир-Саид | Analyst |
+| Mirmahmudov Farrux | Backend developer |
+| Normirzayev Biloliddin | Frontend developer |
+| Akramov Doniyor | Designer |
+| Saidazimov Emir-Said | Analyst |
 
 ## Repository
 
