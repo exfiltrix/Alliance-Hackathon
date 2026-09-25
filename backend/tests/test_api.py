@@ -9,11 +9,11 @@ from sqlalchemy import update
 
 from app import db
 from app.models import Seal
-from tests.conftest import png_pixels, replace_png_pixels, xray_png
+from tests.conftest import admin_headers, png_pixels, replace_png_pixels, xray_png
 
 
 def seal(client, device, data: bytes, name="img.png"):
-    r = client.post("/api/seal", files={"file": (name, data)}, data={"device_id": device["id"]})
+    r = client.post("/api/seal", files={"file": (name, data)}, headers=device["auth"])
     assert r.status_code == 200, r.text
     body = r.json()
     return body, client.get(body["download_url"]).content
@@ -25,12 +25,29 @@ def verify(client, data: bytes, name="img.png"):
     return r.json()
 
 
-def test_device_never_exposes_private_key(client, device, tmp_path):
-    assert set(device) == {"id", "name", "hospital", "public_key_hex", "revoked", "created_at"}
+def test_seal_requires_a_device_token(client, device):
+    """P0-1: sealing must not be possible with a bare device_id and no credentials."""
+    r = client.post("/api/seal", files={"file": ("x.png", xray_png(seed=42))})
+    assert r.status_code == 401
+
+
+def test_create_device_requires_admin_token(client):
+    """P0-1: anyone reaching the API must not be able to mint a trusted device."""
+    assert client.post("/api/devices", json={"name": "attacker-forged-device"}).status_code == 401
+    assert client.post(
+        "/api/devices", json={"name": "attacker-forged-device"}, headers={"Authorization": "Bearer wrong"}
+    ).status_code == 401
+
+
+def test_device_never_exposes_private_key_or_token(client, device, tmp_path):
+    assert set(device) - {"auth"} == {"id", "name", "hospital", "public_key_hex", "revoked", "created_at", "token"}
     assert len(device["public_key_hex"]) == 64
+    assert len(device["token"]) > 20  # returned once, at creation, only
     pem = (tmp_path / "keys" / f"device_{device['id']}.pem").read_bytes()
     listed = client.get("/api/devices").text
-    assert b"PRIVATE KEY" in pem and "PRIVATE" not in listed
+    assert b"PRIVATE KEY" in pem
+    assert "PRIVATE" not in listed
+    assert device["token"] not in listed
 
 
 def test_png_round_trip(client, device):
@@ -119,17 +136,17 @@ def test_reseal_same_image_is_idempotent(client, device):
 
     px = png_pixels(sealed)
     px[0, 0] ^= 1
-    r = client.post("/api/seal", files={"file": ("x.png", replace_png_pixels(sealed, px))}, data={"device_id": device["id"]})
+    r = client.post("/api/seal", files={"file": ("x.png", replace_png_pixels(sealed, px))}, headers=device["auth"])
     assert r.status_code == 409
 
 
 def test_revoked_device(client, device):
     _, sealed = seal(client, device, xray_png())
-    client.post(f"/api/devices/{device['id']}/revoke")
+    client.post(f"/api/devices/{device['id']}/revoke", headers=admin_headers())
     result = verify(client, sealed)
     assert result["status"] == "forged" and result["reason"] == "device_revoked"
-    r = client.post("/api/seal", files={"file": ("x.png", xray_png(seed=5))}, data={"device_id": device["id"]})
-    assert r.status_code == 409
+    r = client.post("/api/seal", files={"file": ("x.png", xray_png(seed=5))}, headers=device["auth"])
+    assert r.status_code == 403  # require_device rejects a revoked device's token before sealing
 
 
 def test_rejects_unknown_format(client, device):

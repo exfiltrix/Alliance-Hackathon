@@ -2,7 +2,6 @@ import type {
   AiModel,
   CrashTestJob,
   CrashTestRequest,
-  Device,
   Passport,
   SealResponse,
   Stats,
@@ -77,15 +76,16 @@ export function pngSrc(b64OrUrl: string): string {
 }
 
 const realApi = {
-  getDevices: () => request<Device[]>("/devices"),
-  createDevice: (name: string, hospital: string) =>
-    post<Device>("/devices", { name, hospital }),
-
-  seal: (file: File, deviceId: number) => {
+  // Goes through the Next.js route handler (src/app/api/seal/route.ts), not the backend
+  // directly: the device token that authorizes sealing is a server-only secret (P0-1).
+  seal: (file: File) => {
     const form = new FormData();
     form.append("file", file);
-    form.append("device_id", String(deviceId));
-    return post<SealResponse>("/seal", form);
+    return fetch("/api/seal", { method: "POST", body: form }).then(async (res) => {
+      const text = await res.text();
+      if (!res.ok) throw new ApiError(res.status, detailOf(text) || res.statusText);
+      return JSON.parse(text) as SealResponse;
+    });
   },
 
   verify: (file: File) => {

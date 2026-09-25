@@ -7,24 +7,35 @@ Errors: `{"detail": "message"}` with status `404` (not found), `409` (conflict),
 All times are UTC ISO strings: `"2026-09-26T10:00:00Z"`.
 
 ## Devices
-| Method | Path | Body | Returns |
-|---|---|---|---|
-| GET | `/devices` | — | list of devices |
-| POST | `/devices` | `{name, hospital}` | `201` device; key pair is generated, private key stays server-side only |
-| POST | `/devices/{id}/revoke` | — | device with `revoked: true` |
+| Method | Path | Auth | Body | Returns |
+|---|---|---|---|---|
+| GET | `/devices` | — (public) | — | list of devices |
+| POST | `/devices` | `Authorization: Bearer <MEDSEAL_ADMIN_TOKEN>` | `{name, hospital}` | `201` device + a **one-time** bearer token; key pair is generated, private key stays server-side only |
+| POST | `/devices/{id}/revoke` | admin token | — | device with `revoked: true` |
 
-Device: `{id, name, hospital, public_key_hex, revoked, created_at}`
+Device: `{id, name, hospital, public_key_hex, revoked, created_at}` (create also returns `token`, once — see below).
+`401` without a valid admin token; `MEDSEAL_ADMIN_TOKEN` unset means these two endpoints refuse every request.
+
+**Device tokens.** `POST /devices` mints a random bearer token and returns it **only in that response**; only its
+sha256 (`token_hash`) is stored. That token — not `device_id` — is what proves a request comes from a given
+scanner gateway, so keep it as secret as the private key: never in a browser-exposed `NEXT_PUBLIC_*` var. The demo
+gateway's device is created with `backend/scripts/create_demo_device.py` (bypasses HTTP, no admin token needed for
+that one bootstrap step), and the frontend reads its token from a server-only env var — see `POST /seal` below.
 
 ## Seal
-`POST /seal` — form: `file`, `device_id`
+`POST /seal` — form: `file`; **`Authorization: Bearer <device token>`** — the device is resolved from the token,
+there is no `device_id` field anymore (a client can no longer seal as an arbitrary device).
 ```json
 { "seal_id": 12, "uid": "1.3.6.1...", "device_id": 1, "tiles": 256, "tile": 32,
   "shape": [512, 512], "root": "9f2c…", "created_at": "2026-09-26T10:00:00Z",
   "download_url": "/api/seal/12/file", "seal_ms": 0.7 }
 ```
+- `401` missing/invalid device token, `403` the device is revoked.
 - Sealing the same image again returns the existing seal (same `seal_id`).
-- `409` if the image ID is already sealed with different pixels, or the device is revoked. `404` unknown device.
+- `409` if the image ID is already sealed with different pixels.
 - `root` is 64 hex chars; show a short form in the UI (e.g. first 8 + "…").
+- The frontend never talks to this endpoint directly: `by_billy/frontend/src/app/api/seal/route.ts` is a Next.js
+  route handler that adds the token server-side from `MEDSEAL_DEVICE_TOKEN` (see `by_billy/frontend/.env.example`).
 
 `GET /seal/{id}/file` — sealed file to download: DICOM with patient tags removed (pixels unchanged) / PNG with `medseal_uid` chunk (pixels unchanged).
 **For the demo, verify the downloaded file** — a PNG that never went through `/seal` has no `medseal_uid` and is always `unsigned`.

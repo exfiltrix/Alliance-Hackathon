@@ -10,6 +10,9 @@ from pydicom.data import get_testdata_file
 from app.config import settings
 
 
+ADMIN_TOKEN = "test-admin-token"
+
+
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     """API client with its own SQLite file, key dir and storage dir."""
@@ -17,17 +20,29 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "keys_dir", tmp_path / "keys")
     monkeypatch.setattr(settings, "storage_dir", tmp_path / "storage")
     monkeypatch.setattr(settings, "ai_enabled", False)  # AI tests switch it on themselves
+    monkeypatch.setattr(settings, "admin_token", ADMIN_TOKEN)
     from app.main import app
 
     with TestClient(app) as c:
         yield c
 
 
+def admin_headers():
+    return {"Authorization": f"Bearer {ADMIN_TOKEN}"}
+
+
 @pytest.fixture
 def device(client):
-    r = client.post("/api/devices", json={"name": "KT-01", "hospital": "Namangan viloyat shifoxonasi"})
+    """A device plus its bearer token (device['token'], device['auth'] header dict) for POST /seal."""
+    r = client.post(
+        "/api/devices",
+        json={"name": "KT-01", "hospital": "Namangan viloyat shifoxonasi"},
+        headers=admin_headers(),
+    )
     assert r.status_code == 201
-    return r.json()
+    body = r.json()
+    body["auth"] = {"Authorization": f"Bearer {body['token']}"}
+    return body
 
 
 @pytest.fixture

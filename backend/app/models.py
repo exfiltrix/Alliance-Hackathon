@@ -25,6 +25,7 @@ class Device(Base):
     name: Mapped[str] = mapped_column(String(200))
     hospital: Mapped[str] = mapped_column(String(300), default="")
     public_key_hex: Mapped[str] = mapped_column(String(64))
+    token_hash: Mapped[str] = mapped_column(String(64), default="")  # sha256 of the bearer token; see app.auth
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
