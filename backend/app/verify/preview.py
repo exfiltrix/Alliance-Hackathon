@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 
 MAX_SIDE = 1024
 RED = (230, 30, 30)
+WHITE = (255, 255, 255)
 
 
 def to_uint8(px: np.ndarray) -> np.ndarray:
@@ -28,9 +29,16 @@ def render_preview(px: np.ndarray, changed: list[tuple[int, int]] = (), tile: in
     if changed:
         draw = ImageDraw.Draw(img)
         width = max(2, round(max(img.size) / 256))
+        inner = max(1, width // 2)
         for y, x in changed:
             box = [x * scale, y * scale, (x + tile) * scale - 1, (y + tile) * scale - 1]
             draw.rectangle(box, outline=RED, width=width)
+            # White inner stroke keeps the boundary visible on bright and grayscale views.
+            draw.rectangle(
+                [box[0] + width, box[1] + width, box[2] - width, box[3] - width],
+                outline=WHITE,
+                width=inner,
+            )
     buf = io.BytesIO()
     img.save(buf, "PNG", optimize=True)
     return base64.b64encode(buf.getvalue()).decode()

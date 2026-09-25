@@ -26,6 +26,7 @@ class Device(Base):
     hospital: Mapped[str] = mapped_column(String(300), default="")
     public_key_hex: Mapped[str] = mapped_column(String(64))
     token_hash: Mapped[str] = mapped_column(String(64), default="")  # sha256 of the bearer token; see app.auth
+    cert_sig_hex: Mapped[str] = mapped_column(String(128), default="")  # root-signed device certificate
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -47,6 +48,10 @@ class Seal(Base):
     root_hex: Mapped[str] = mapped_column(String(64))
     meta_hash_hex: Mapped[str] = mapped_column(String(64), default="")  # sha256 of imaging.meta_fields; see P0-5
     meta_json: Mapped[str] = mapped_column(Text, default="{}")  # the fields themselves, for changed_meta on verify
+    meta_version: Mapped[int] = mapped_column(Integer, default=1)  # 1 = legacy META_TAGS, 2 = display-affecting v2
+    sig_version: Mapped[int] = mapped_column(Integer, default=1)  # 1 = legacy signature, 2 = canonical header
+    patient_ref: Mapped[str] = mapped_column(String(64), default="")  # HMAC PatientID, never the ID itself
+    phi_warning: Mapped[str] = mapped_column(String(64), default="")  # non-cryptographic upload warning
     dhash_hex: Mapped[str] = mapped_column(String(16), default="")  # imaging.dhash; content-based recovery, P1-03
     sig_hex: Mapped[str] = mapped_column(String(128))
     prev_hash: Mapped[str] = mapped_column(String(64), unique=True)  # unique => the chain cannot fork
@@ -99,4 +104,5 @@ class Passport(Base):
     conditions: Mapped[str] = mapped_column(Text, default="")  # JSON list of condition codes
     organisation: Mapped[str] = mapped_column(String(300), default="")
     report_json: Mapped[str] = mapped_column(Text, default="{}")
+    signature_hex: Mapped[str] = mapped_column(String(128), default="")  # root signature over the frozen report
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -12,7 +12,7 @@ from pathlib import Path
 from PIL import Image
 
 from app.ai import attacks, model
-from app.imaging import load_image
+from app.imaging import display_pixels, load_image
 
 
 def main():
@@ -25,7 +25,7 @@ def main():
     args = ap.parse_args()
 
     img = load_image(Path(args.image).read_bytes())
-    x = model.preprocess(img.px)
+    x = model.preprocess(display_pixels(img))
     x_adv = attacks.ATTACKS[args.method](x, args.eps, args.pathology)
 
     out = Path(args.out)

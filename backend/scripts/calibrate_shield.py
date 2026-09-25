@@ -16,8 +16,9 @@ import numpy as np
 import torch
 
 from app.ai import attacks, model, shield
+from app.ai.statistics import clopper_pearson
 from app.config import settings
-from app.imaging import load_image
+from app.imaging import display_pixels, load_image
 
 PERCENTILE = 99
 EPS = [0.5, 1, 2, 4]
@@ -25,7 +26,7 @@ BATCH = 8
 
 
 def load_inputs(paths) -> list[np.ndarray]:
-    return [model.model_input(load_image(p.read_bytes()).px) for p in paths]
+    return [model.model_input(display_pixels(load_image(p.read_bytes()))) for p in paths]
 
 
 def batched_distances(imgs: list[np.ndarray]) -> np.ndarray:
@@ -62,20 +63,38 @@ def main():
                 s = model.scores(torch.cat([model.preprocess(a) for a in adv]))[:, idx]
             fooled = [a for a, v in zip(adv, s) if v > model.THRESHOLD]
             rate = round(float((batched_distances(fooled) > threshold).mean()), 3) if fooled else None
-            detection[method][f"{eps:g}"] = {"attacks_that_fooled_model": len(fooled), "detected": rate}
+            detection[method][f"{eps:g}"] = {
+                "attacks_that_fooled_model": len(fooled),
+                "detected_count": round(rate * len(fooled)) if rate is not None else 0,
+                "detected": rate,
+            }
             print(f"{method} eps={eps:g}: fooled {len(fooled)}/{len(x)}, detected {rate if rate is None else f'{rate:.0%}'}")
 
-    settings.shield_calibration.write_text(json.dumps({
+    previous = {}
+    if settings.shield_calibration.exists():
+        previous = json.loads(settings.shield_calibration.read_text())
+    payload = {
         "method": "median 3x3, L1 distance of DenseNet logits",
         "threshold": threshold,
         "percentile": PERCENTILE,
         "dataset": "NIH ChestX-ray14 (CC0), 300 px subset: No Finding + findings",
         "n_calibration": len(calib),
         "n_held_out": len(held),
+        "false_positive_count": round(fpr * len(held)),
         "false_positive_rate": round(fpr, 3),
         "detection_rate": detection,
+        "confidence_intervals": {
+            "detection_pgd_eps1": list(clopper_pearson(
+                detection["pgd"]["1"]["detected_count"], detection["pgd"]["1"]["attacks_that_fooled_model"]
+            )),
+            "false_positive_rate": list(clopper_pearson(round(fpr * len(held)), len(held))),
+        },
+        "adaptive_attack_tested": False,
         "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-    }, indent=2) + "\n")
+    }
+    if "adaptive" in previous:
+        payload["adaptive"] = previous["adaptive"]
+    settings.shield_calibration.write_text(json.dumps(payload, indent=2) + "\n")
     print("saved", settings.shield_calibration)
 
 

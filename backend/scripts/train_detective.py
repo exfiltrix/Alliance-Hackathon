@@ -24,7 +24,7 @@ import torch.nn.functional as F
 
 from app.ai import detective, fakes, model
 from app.config import settings
-from app.imaging import load_image
+from app.imaging import display_pixels, load_image
 
 SEED = 0
 TEST_SHARE = 0.2
@@ -33,7 +33,7 @@ BATCH = 32
 
 def load_dir(*dirs) -> np.ndarray:
     paths = sorted(p for d in dirs for p in (settings.data_dir / d).glob("*.png"))
-    return np.stack([model.model_input(load_image(p.read_bytes()).px) for p in paths])
+    return np.stack([model.model_input(display_pixels(load_image(p.read_bytes()))) for p in paths])
 
 
 def cached(name: str, *dirs) -> np.ndarray:
