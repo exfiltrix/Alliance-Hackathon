@@ -172,6 +172,26 @@ def test_seal_made_after_revocation_is_forged(client, device):
     assert result["status"] == "forged" and result["reason"] == "device_revoked"
 
 
+def test_png_alpha_only_edit_is_detected(client, device):
+    """P0-3: alpha carries no luminance, so this edit is luminance-invariant — catching it proves
+    the seal hashes every channel, not just grayscale luminance."""
+    rng = np.random.default_rng(7)
+    rgba = np.zeros((256, 256, 4), np.uint8)
+    rgba[..., :3] = rng.integers(0, 256, (256, 256, 3), dtype=np.uint8)
+    rgba[..., 3] = 255
+    buf = io.BytesIO()
+    Image.fromarray(rgba, "RGBA").save(buf, "PNG")
+
+    _, sealed_bytes = seal(client, device, buf.getvalue())
+    px = np.array(Image.open(io.BytesIO(sealed_bytes)))
+    edited = px.copy()
+    edited[64:128, 64:128, 3] = 0  # a region becomes fully transparent; R/G/B untouched
+    fake = replace_png_pixels(sealed_bytes, edited)
+
+    result = verify(client, fake)
+    assert result["status"] == "tampered"
+
+
 def test_rejects_unknown_format(client, device):
     r = client.post("/api/verify", files={"file": ("x.jpg", b"not an image")})
     assert r.status_code == 415

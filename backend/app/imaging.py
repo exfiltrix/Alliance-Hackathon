@@ -32,7 +32,10 @@ class ImageError(ValueError):
 @dataclass
 class LoadedImage:
     kind: Literal["dicom", "png"]
-    px: np.ndarray  # 2-D grayscale, original dtype
+    # DICOM: always 2-D grayscale (multi-channel DICOM is rejected below). PNG: native channel
+    # layout — 2-D grayscale or 3-D (h, w, channels) for RGB/RGBA — original dtype. The seal
+    # hashes this array exactly as-is (P0-3): never flatten it to grayscale before sealing.
+    px: np.ndarray
     uid: str | None  # None = image carries no ID (never sealed)
     dataset: pydicom.Dataset | None = None
     pil: Image.Image | None = None
@@ -75,14 +78,35 @@ def _load_png(data: bytes) -> LoadedImage:
         img.load()
     except Exception as e:
         raise ImageError(f"Cannot read PNG file: {e}") from e
-    return LoadedImage("png", gray_pixels(img), img.text.get(PNG_UID_KEY), pil=img)
+    return LoadedImage("png", native_pixels(img), img.text.get(PNG_UID_KEY), pil=img)
 
 
-def gray_pixels(img: Image.Image) -> np.ndarray:
-    """Grayscale pixels keeping the original bit depth (8-bit L, 16-bit I;16, 32-bit I)."""
-    if img.mode not in ("L", "I", "I;16", "I;16B", "I;16L", "F"):
-        img = img.convert("L")
+_NATIVE_MODES = ("L", "I", "I;16", "I;16B", "I;16L", "F", "RGB", "RGBA")
+
+
+def native_pixels(img: Image.Image) -> np.ndarray:
+    """Pixels in their native channel layout, original bit depth: 2-D for L/I/I;16/F, 3-D
+    (h, w, channels) for RGB/RGBA. Every channel is sealed (P0-3) — a color-only edit, or making
+    a region transparent, changes the hashed bytes even though luminance alone would not.
+    Palette (P) images are expanded to RGB/RGBA explicitly (a palette index is not a color)."""
+    if img.mode == "P":
+        img = img.convert("RGBA" if "transparency" in img.info else "RGB")
+    elif img.mode not in _NATIVE_MODES:
+        img = img.convert("RGB")
     return np.array(img)
+
+
+def to_grayscale(px: np.ndarray) -> np.ndarray:
+    """2-D luminance view for display/AI purposes only — the seal always hashes the native
+    array from native_pixels() above; this never feeds into a hash."""
+    if px.ndim == 2:
+        return px
+    rgb = px[..., :3].astype(np.float64)
+    lum = rgb[..., 0] * 0.299 + rgb[..., 1] * 0.587 + rgb[..., 2] * 0.114
+    if np.issubdtype(px.dtype, np.integer):
+        info = np.iinfo(px.dtype)
+        lum = np.clip(np.round(lum), info.min, info.max)
+    return lum.astype(px.dtype)
 
 
 def assign_uid(image: LoadedImage) -> str:

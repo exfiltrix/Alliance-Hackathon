@@ -10,7 +10,7 @@ import time
 from sqlalchemy.orm import Session
 
 from app.ai import hooks
-from app.imaging import LoadedImage
+from app.imaging import LoadedImage, to_grayscale
 from app.models import Device, Verification
 from app.seal import core, keys, ledger
 from app.verify.preview import render_preview
@@ -57,10 +57,13 @@ def verify_upload(session: Session, image: LoadedImage) -> dict:
                 result["warning"] = warning
     result["verify_ms"] = round((time.perf_counter() - t0) * 1000, 2)
 
-    result["preview_png"] = render_preview(image.px, result["changed_tiles"], result["tile"] or 0)
+    # The seal above hashes every channel (P0-3); display and the AI modules only ever need
+    # grayscale, converted here — that conversion never touches what got hashed.
+    gray = to_grayscale(image.px)
+    result["preview_png"] = render_preview(gray, result["changed_tiles"], result["tile"] or 0)
     if result["status"] == "unsigned":
-        result["detective"] = hooks.run_detective(image.px)
-    result["shield"] = hooks.run_shield(image.px)
+        result["detective"] = hooks.run_detective(gray)
+    result["shield"] = hooks.run_shield(gray)
     result["note"] = DOCTOR_NOTE
 
     session.add(
