@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -53,10 +55,16 @@ def create_device(body: DeviceIn, session: Session = Depends(get_session)):
 
 @router.post("/{device_id}/revoke", dependencies=[Depends(require_admin)])
 def revoke_device(device_id: int, session: Session = Depends(get_session)):
-    """After revocation, seals made by this device verify as `forged` (reason: device_revoked)."""
+    """Seals made by this device AFTER revoked_at verify as `forged` (reason: device_revoked).
+    Seals made before it (e.g. the key was stolen just now, not at creation) stay authentic/tampered
+    as normal, with a warning — see verify.service."""
     device = session.get(Device, device_id)
     if device is None:
         raise HTTPException(404, "Device not found")
     device.revoked = True
+    # Full precision (not the whole-second utcnow() used for hashed ledger timestamps): revoked_at
+    # is never part of a hash, and second-level rounding could otherwise tie with a seal's
+    # created_at made moments earlier in the same test/request burst.
+    device.revoked_at = datetime.now(timezone.utc)
     session.commit()
     return device_json(device)

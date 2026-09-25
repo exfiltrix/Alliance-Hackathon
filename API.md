@@ -49,6 +49,7 @@ there is no `device_id` field anymore (a client can no longer seal as an arbitra
 { "status": "authentic | tampered | unsigned | forged",
   "uid": "…", "device": "KT-01", "seal_id": 12,
   "changed_tiles": [[64,16],[64,32]], "tile": 32,
+  "warning": "device_revoked_later",
   "verify_ms": 1.1,
   "preview_png": "base64…",
   "detective": { "probability": 0.87, "heatmap_png": "base64…", "experimental": false },
@@ -58,6 +59,7 @@ there is no `device_id` field anymore (a client can no longer seal as an arbitra
 - `changed_tiles`: `[y, x]` of the top-left corner of each changed tile, in original image pixels; tile size is `tile`. `preview_png` already has red boxes drawn on them (preview is scaled down to max 1024 px).
 - `unsigned`: `uid`, `device`, `seal_id`, `tile` are `null`.
 - `forged`: extra field `reason` = `ledger_entry_modified | bad_signature | device_revoked | unknown_device`; `changed_tiles` is empty (tiles are not compared against an untrusted record).
+- `warning` (optional, on `authentic`/`tampered` only) = `device_revoked_later`: the device was revoked **after** this particular seal was made, so the seal itself is still trusted — revocation is not retroactive. A seal made at/after the device's `revoked_at` is `forged`/`device_revoked` instead, not a warning.
 - `detective` key is present only when `status == "unsigned"` (a sealed image is checked by the seal, exactly). `detective` / `shield` are `null` when the AI is off (`MEDSEAL_AI=0`, torch not installed, detective not trained) — the UI must handle `null` for both.
 - `detective.probability` = chance the image was edited (0..1). `heatmap_png` is a 448×448 RGB PNG of the 224×224 picture the model sees (centre square crop of the image), with a Grad-CAM heatmap where the detective looked; show it next to the preview, not over it. `experimental: true` → add an "experimental" badge (the detective scored below AUC 0.9 on held-out images). ~50 ms; the first call after startup ~1 s.
 - `shield` runs on every status, including `authentic`: the seal proves where the image came from, the shield checks whether its pixels carry an adversarial attack (an attacked image can be sealed too).
