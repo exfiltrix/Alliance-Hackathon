@@ -23,7 +23,10 @@ async def lifespan(app: FastAPI):
         # P1-03: fills dhash_hex for rows sealed before this column existed. Read-only over the
         # stored files, writes only dhash_hex — never a hashed/signed field.
         backfill_dhash(session, _read_sealed_file)
-    yield
+    try:
+        yield
+    finally:
+        crash_test.shutdown_worker(wait=True)
 
 
 app = FastAPI(title="MedSeal API", version="0.1.0", lifespan=lifespan)

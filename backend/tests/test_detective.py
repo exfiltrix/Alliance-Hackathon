@@ -62,10 +62,39 @@ class TestTrained:
         r = client.post("/api/verify", files={"file": ("x.png", png)}).json()
         assert r["status"] == "unsigned" and 0 <= r["detective"]["probability"] <= 1
         seal = client.post("/api/seal", files={"file": ("x.png", png)}, headers=device["auth"]).json()
-        sealed = client.get(seal["download_url"]).content
+        sealed = client.get(seal["download_url"], headers=device["auth"]).content
         r = client.post("/api/verify", files={"file": ("x.png", sealed)}).json()
         assert r["status"] == "authentic" and "detective" not in r
 
     def test_hook_respects_switch(self, xray, monkeypatch):
         monkeypatch.setattr(settings, "ai_enabled", False)
         assert hooks.run_detective(xray) is None
+
+    def test_grad_cam_is_thread_safe(self, xray):
+        """SEC-04: grad_cam registers a forward hook on the shared net; _GRAD_CAM_LOCK must
+        serialise concurrent callers so two requests never see each other's hook/activation."""
+        import threading
+
+        net = detective.load()
+        x = detective.to_tensor(xray)
+        expected_prob, expected_cam = detective.grad_cam(net, x)
+
+        results: list[tuple[float, np.ndarray]] = [None, None]  # type: ignore[list-item]
+        errors: list[Exception] = []
+
+        def call(i: int) -> None:
+            try:
+                results[i] = detective.grad_cam(net, x)
+            except Exception as e:  # pragma: no cover - surfaced via errors list
+                errors.append(e)
+
+        threads = [threading.Thread(target=call, args=(i,)) for i in range(2)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=30)
+
+        assert not errors, errors
+        for prob, cam in results:
+            assert prob == pytest.approx(expected_prob)
+            assert np.allclose(cam, expected_cam)

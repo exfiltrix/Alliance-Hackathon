@@ -26,7 +26,8 @@ def _bearer(authorization: str | None) -> str:
 
 def require_admin(authorization: str | None = Header(default=None)) -> None:
     token = _bearer(authorization)
-    if not settings.admin_token or not hmac.compare_digest(token, settings.admin_token):
+    # Compare bytes so a non-ASCII request cannot raise a TypeError and turn auth into a 500.
+    if not settings.admin_token or not hmac.compare_digest(token.encode(), settings.admin_token.encode()):
         raise HTTPException(401, "Invalid admin token")
 
 
@@ -36,6 +37,20 @@ def hash_token(token: str) -> str:
 
 def new_device_token() -> str:
     return secrets.token_urlsafe(32)
+
+
+def require_device_or_admin(
+    authorization: str | None = Header(default=None),
+    session: Session = Depends(get_session),
+) -> Device | None:
+    """Authorize read-only device artifacts with either the admin token or a device token."""
+    token = _bearer(authorization)
+    if settings.admin_token and hmac.compare_digest(token.encode(), settings.admin_token.encode()):
+        return None
+    device = session.scalar(select(Device).where(Device.token_hash == hash_token(token)))
+    if device is None:
+        raise HTTPException(401, "Invalid device or admin token")
+    return device
 
 
 def require_device(

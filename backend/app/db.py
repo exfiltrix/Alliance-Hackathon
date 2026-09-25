@@ -1,10 +1,14 @@
 from collections.abc import Iterator
 
+import logging
+
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
+
+log = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -27,6 +31,7 @@ def init_engine(url: str | None = None) -> Engine:
     SessionLocal.configure(bind=engine)
     Base.metadata.create_all(engine)
     _add_missing_columns(engine)
+    _ensure_seal_uid_index(engine)
     return engine
 
 
@@ -44,6 +49,18 @@ def _add_missing_columns(engine: Engine) -> None:
                     if default is not None:
                         ddl += f" DEFAULT '{default}'" if isinstance(default, str) else f" DEFAULT {default}"
                     conn.execute(text(ddl))
+
+
+def _ensure_seal_uid_index(engine: Engine) -> None:
+    """Create the UID uniqueness guard without making legacy duplicate data unbootable."""
+    with engine.begin() as conn:
+        duplicate = conn.execute(
+            text("SELECT uid FROM seals GROUP BY uid HAVING COUNT(*) > 1 LIMIT 1")
+        ).first()
+        if duplicate is not None:
+            log.warning("Skipping unique seals.uid index: existing duplicate UID rows are present")
+            return
+        conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS ix_seals_uid_unique ON seals (uid)"))
 
 
 def get_session() -> Iterator[Session]:

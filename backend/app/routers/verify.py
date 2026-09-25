@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, File, UploadFile
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.db import get_session
@@ -10,4 +11,5 @@ router = APIRouter(tags=["verify"])
 
 @router.post("/verify")
 async def verify(file: UploadFile = File(...), session: Session = Depends(get_session)):
-    return verify_upload(session, await read_upload(file))
+    image = await read_upload(file)
+    return await run_in_threadpool(verify_upload, session, image)

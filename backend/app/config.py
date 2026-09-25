@@ -28,6 +28,8 @@ class Settings:
         r"http://(10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+):3000",
     )
     max_upload_bytes: int = 50 * 1024 * 1024
+    # Hard pixel budget checked from image headers before decoding pixels.
+    max_pixels: int = int(os.environ.get("MEDSEAL_MAX_PIXELS", "40000000"))
     # Public/synthetic images (scripts/fetch_*.py). Crash test reads data/nih/normal, then data/samples.
     data_dir: Path = _path("MEDSEAL_DATA_DIR", BACKEND_DIR.parent / "data")
     # Run the AI shield/detective inside /verify (needs torch + weights). MEDSEAL_AI=0 turns them off.
@@ -35,6 +37,14 @@ class Settings:
     # Required to create/revoke devices (POST /devices, /devices/{id}/revoke). No default: unset means
     # those endpoints refuse every request, rather than silently accepting an empty bearer token.
     admin_token: str = os.environ.get("MEDSEAL_ADMIN_TOKEN", "")
+    # Optional HMAC salt used to bind a DICOM PatientID without storing it. Keep it stable.
+    patient_salt: str = os.environ.get("MEDSEAL_PATIENT_SALT", "")
+    # Root signing material. The private key stays in the gateway/HSM; verifiers use root.pub only.
+    root_key_path: Path = _path("MEDSEAL_ROOT_KEY_PATH", BACKEND_DIR / "keys" / "root.pem")
+    root_pubkey_path: Path = _path("MEDSEAL_ROOT_PUBKEY_PATH", BACKEND_DIR / "keys" / "root.pub")
+    require_device_cert: bool = os.environ.get("MEDSEAL_REQUIRE_DEVICE_CERT", "1") != "0"
+    # Append-only external hash-chain anchors. Never store this file in the database trust root.
+    anchor_path: Path = _path("MEDSEAL_ANCHOR_PATH", BACKEND_DIR / "anchors" / "anchors.jsonl")
     # Shield threshold + measured quality (scripts/calibrate_shield.py). Committed; the passport reads it too.
     shield_calibration: Path = BACKEND_DIR / "app" / "ai" / "shield_calibration.json"
     # Detective weights (scripts/train_detective.py) and their held-out quality.

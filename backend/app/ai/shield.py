@@ -12,6 +12,7 @@ The threshold is the 99th percentile of the score on clean X-rays
 (95th gave 8% false alarms on held-out images; PGD at eps >= 1 px is still caught 100%).
 """
 import json
+import threading
 from functools import lru_cache
 
 import numpy as np
@@ -20,6 +21,8 @@ from PIL import Image, ImageFilter
 
 from app.ai import model
 from app.config import settings
+
+_CHECK_LOCK = threading.Lock()
 
 
 def squeeze(img: np.ndarray) -> np.ndarray:
@@ -41,6 +44,7 @@ def calibration() -> dict:
 
 
 def check(px: np.ndarray) -> dict:
-    score = float(distances([model.model_input(px)])[0])
-    threshold = calibration()["threshold"]
+    with _CHECK_LOCK:
+        score = float(distances([model.model_input(px)])[0])
+        threshold = calibration()["threshold"]
     return {"attack_suspected": score > threshold, "score": round(score, 3), "threshold": threshold}

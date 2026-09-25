@@ -8,6 +8,7 @@ detective_metrics.json. The output is a probability, never a verdict.
 import base64
 import io
 import json
+import threading
 from functools import lru_cache
 
 import cv2
@@ -21,7 +22,8 @@ from app.ai import model
 from app.config import settings
 
 MEAN, STD = 0.449, 0.226  # ImageNet statistics, grey
-EXPERIMENTAL_BELOW_AUC = 0.9  # weaker models are shown as "experimental" in the UI
+EXPERIMENTAL_BELOW_AUC = 0.9  # retained for training reports; public detector is always experimental
+_GRAD_CAM_LOCK = threading.Lock()
 
 
 def build(pretrained: bool = False) -> nn.Module:
@@ -43,7 +45,7 @@ def to_tensor(imgs: list[np.ndarray] | np.ndarray) -> torch.Tensor:
 @lru_cache(maxsize=1)
 def load() -> nn.Module:
     net = build()
-    net.load_state_dict({k: v.float() for k, v in torch.load(settings.detective_weights, map_location="cpu").items()})
+    net.load_state_dict({k: v.float() for k, v in torch.load(settings.detective_weights, map_location="cpu", weights_only=True).items()})
     net.eval()
     return net
 
@@ -54,6 +56,11 @@ def metrics() -> dict:
 
 
 def grad_cam(net: nn.Module, x: torch.Tensor) -> tuple[float, np.ndarray]:
+    with _GRAD_CAM_LOCK:
+        return _grad_cam_unlocked(net, x)
+
+
+def _grad_cam_unlocked(net: nn.Module, x: torch.Tensor) -> tuple[float, np.ndarray]:
     """-> (probability of forgery, 224x224 heatmap in 0..1) for a [1, 1, 224, 224] input."""
     feats = {}
     handle = net.layer4.register_forward_hook(lambda _m, _i, out: feats.update(a=out))

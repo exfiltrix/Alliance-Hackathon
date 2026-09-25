@@ -10,7 +10,7 @@ import torch
 
 from app.ai import attacks, model
 from app.config import settings
-from app.imaging import ImageError, load_image
+from app.imaging import ImageError, display_pixels, load_image
 from app.verify.preview import render_preview
 
 SCORE_EPS = 1.0
@@ -34,7 +34,8 @@ def load_healthy(n: int, pathology: str) -> tuple[torch.Tensor, list[str]]:
     picked, sources = [], set()
     for path in image_files():
         try:
-            x = model.preprocess(load_image(path.read_bytes()).px)
+            image = load_image(path.read_bytes())
+            x = model.preprocess(display_pixels(image))
         except ImageError:
             continue
         with torch.no_grad():

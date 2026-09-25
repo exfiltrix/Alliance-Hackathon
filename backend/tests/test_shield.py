@@ -71,7 +71,7 @@ def test_verify_reports_shield(client, device, attacked_png, monkeypatch):
     monkeypatch.setattr(settings, "ai_enabled", True)
     # sealing does not clean the image: the seal proves origin, the shield checks content
     seal = client.post("/api/seal", files={"file": ("a.png", attacked_png)}, headers=device["auth"]).json()
-    sealed = client.get(seal["download_url"]).content
+    sealed = client.get(seal["download_url"], headers=device["auth"]).content
     r = client.post("/api/verify", files={"file": ("a.png", sealed)}).json()
     assert r["status"] == "authentic"
     assert r["shield"]["attack_suspected"] is True
