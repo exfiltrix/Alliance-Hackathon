@@ -83,7 +83,9 @@ Python backend still separately requires the device bearer token (P0-1) regardle
 `GET /models` → `[{id, name, version, source, intended_use}]` — the built-in torchxrayvision DenseNet is created on startup; it is the only model that can be crash-tested.
 
 ## Crash test
-`POST /crash-test` — `{model_id, n_images: 50, eps: [0.5,1,2,4], method: "fgsm" | "pgd"}` → `202 {job_id}`
+`POST /crash-test` — `Authorization: Bearer <MEDSEAL_ADMIN_TOKEN>` — `{model_id, n_images: 50, eps: [0.5,1,2,4], method: "fgsm" | "pgd"}` → `202 {job_id}`
+- **P1-04:** admin-only (`401` without the admin token) — the frontend calls its own `POST /api/crash-test` route handler
+  (Basic Auth + `MEDSEAL_ADMIN_TOKEN` added server-side), never the backend directly. Reading endpoints below stay public.
 - Defaults as shown; `n_images` 1–200, each eps in (0, 16] pixel units. Errors: 404 unknown model, 400 not the built-in model, 422 bad input, 503 AI modules not installed.
 - One job runs at a time; 50 images with PGD take ~80 s on a laptop CPU. Poll `GET /crash-test/{job_id}` every ~1 s.
 
@@ -95,7 +97,8 @@ Python backend still separately requires the device bearer token (P0-1) regardle
 when done:
 ```json
 { "job_id": 3, "model_id": 1, "created_at": "…", "status": "done", "progress": 1.0,
-  "n_images": 50, "method": "pgd", "pathology": "Pneumonia", "data": ["nih/normal"],
+  "n_requested": 50, "n_images": 50, "protocol_compliant": true,
+  "method": "pgd", "pathology": "Pneumonia", "data": ["nih/normal"],
   "eps": [0.5, 1, 2, 4],
   "flip_rate": {"0.5": 0.32, "1": 0.98, "2": 1.0, "4": 1.0},
   "psnr": {"0.5": 54.7, "1": 50.0, "2": 47.9, "4": 45.0},
@@ -106,14 +109,20 @@ when done:
 - `eps` always contains `1` (added if missing): the score is `round(10 × (1 − flip_rate["1"]), 1)`.
 - `flip_rate` / `psnr` keys are eps formatted without trailing zeros (`"0.5"`, `"1"`, `"2"`). PSNR in dB: > 40 means the noise is invisible to the eye.
 - Images are adult chest X-rays (NIH) the model reads as healthy; `data` lists the folders they came from (`nih/normal`, or `samples` when the dataset is not downloaded); a "flip" = the attack pushed the Pneumonia score above 0.5.
+- `n_requested` vs `n_images`: fewer images than requested may have been available/healthy — always show both, never just the smaller number silently.
+- **P1-04** `protocol_compliant` = `method == "pgd" and n_images >= 50 and 1 in eps` — the exact rule `POST /passport` enforces (see below). A job below this bar can still be inspected but cannot become a passport.
 - A job interrupted by a server restart returns `status: "error"`.
 
 `GET /crash-tests?model_id=1` → finished tests, newest first, same fields as "done" but without `example`.
 
 ## Passport
-`POST /passport` — `{model_id, crash_test_id?, organisation?}` → `201` passport JSON
+`POST /passport` — `Authorization: Bearer <MEDSEAL_ADMIN_TOKEN>` — `{model_id, crash_test_id?, organisation?}` → `201` passport JSON
+- **P1-04:** admin-only (`401` without the admin token) — the frontend calls its own `POST /api/passport` route handler,
+  same as crash tests above. Reading endpoints below stay public.
 - `crash_test_id` defaults to the model's latest finished crash test. `organisation` = responsible organisation (free text, may be empty).
-- Errors: 404 unknown model / crash test of another model, 409 no finished crash test yet.
+- Errors: 404 unknown model / crash test of another model, 409 no finished crash test yet, **409 crash test does not meet
+  the passport protocol** (`PROTOCOL = {method: "pgd", min_images: 50, eps_required: [1]}` — see `protocol_compliant` above;
+  message states what was required vs what the crash test actually had).
 - A passport is frozen at issue time: later seals, verifications or crash tests do not change it. Issue a new one to refresh.
 
 `GET /passport/{id}` → passport JSON · `GET /passports?model_id=1` → summaries `[{id, created_at, organisation, verdict, conditions, model, robustness_score}]`, newest first
@@ -132,6 +141,7 @@ when done:
   "verdict": "allowed_with_conditions",
   "conditions": ["shield_required", "seal_required", "doctor_decides"],
   "rules": { "allow_score": 7.0, "shield_min_detection": 0.9, "shield_max_false_alarms": 0.02 },
+  "protocol": { "method": "pgd", "min_images": 50, "eps_required": [1] },
   "note": "Final decision is made by the doctor." }
 ```
 - `verdict`: `allowed` (score ≥ 7) · `allowed_with_conditions` (score < 7, shield compatible) · `not_allowed` (score < 7, no compatible shield). Show the rule under the verdict — it is built from `rules`.

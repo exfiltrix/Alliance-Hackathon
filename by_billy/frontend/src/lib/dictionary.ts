@@ -547,6 +547,11 @@ const dictionary = {
     },
     createPassport: { uz: "Model pasportini yaratish", ru: "Создать паспорт модели", en: "Create model passport" },
     restart: { uz: "Qayta sinash", ru: "Запустить заново", en: "Run again" },
+    protocolNotMet: {
+      uz: "Bu natija pasport protokoliga mos kelmaydi (kerak: PGD, kamida 50 surat, eps=1 kiritilgan). Pasport yaratib bo'lmaydi.",
+      ru: "Этот результат не соответствует протоколу паспорта (нужно: PGD, не менее 50 снимков, eps=1 включён). Выдать паспорт нельзя.",
+      en: "This result does not meet the passport protocol (needs PGD, at least 50 images, eps=1 included). A passport cannot be issued.",
+    },
   },
   passport: {
     title: { uz: "Model pasporti", ru: "Паспорт модели", en: "Model passport" },

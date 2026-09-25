@@ -15,7 +15,7 @@ const models: AiModel[] = [
 ];
 
 const sealedNames = new Set<string>();
-const jobs = new Map<number, { started: number; modelId: number; n: number }>();
+const jobs = new Map<number, { started: number; modelId: number; n: number; method: string }>();
 const passports = new Map<number, Passport>();
 let nextId = 100;
 
@@ -34,6 +34,7 @@ function mockPassport(id: number, model: AiModel, crashTestId: number): Passport
       formula: "10 × (1 − flip rate at eps = 1 px)",
       crash_test_id: crashTestId,
       tested_at: now,
+      n_requested: 50,
       n_images: 50,
       method: "pgd",
       pathology: "Pneumonia",
@@ -55,6 +56,7 @@ function mockPassport(id: number, model: AiModel, crashTestId: number): Passport
     verdict: "allowed_with_conditions",
     conditions: ["shield_required", "seal_required", "doctor_decides"],
     rules: { allow_score: 7, shield_min_detection: 0.9, shield_max_false_alarms: 0.02 },
+    protocol: { method: "pgd", min_images: 50, eps_required: [1] },
     note: "Final decision is made by the doctor.",
   };
 }
@@ -218,7 +220,7 @@ export const mockApi: Api = {
   async startCrashTest(body) {
     await wait(300);
     const id = nextId++;
-    jobs.set(id, { started: Date.now(), modelId: body.model_id, n: body.n_images });
+    jobs.set(id, { started: Date.now(), modelId: body.model_id, n: body.n_images, method: body.method });
     return { job_id: id };
   },
   async getCrashTest(jobId) {
@@ -235,6 +237,10 @@ export const mockApi: Api = {
     if (done) {
       res.example = { before_png: fakeXray(), after_png: fakeXray(6), before_score: 0.08, after_score: 0.93 };
       res.robustness_score = Math.round(10 * (1 - FLIP["1"]) * 10) / 10;
+      res.n_requested = job?.n ?? 50;
+      res.n_images = job?.n ?? 50;
+      // P1-04 protocol: pgd, >=50 images, eps includes 1 (always true — the page always sends it).
+      res.protocol_compliant = (job?.method ?? "pgd") === "pgd" && (job?.n ?? 50) >= 50;
     }
     return res;
   },

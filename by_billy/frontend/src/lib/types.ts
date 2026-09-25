@@ -69,6 +69,10 @@ export type CrashTestJob = {
   status: "queued" | "running" | "done" | "error";
   progress: number;
   error?: string;
+  n_requested?: number; // how many images were asked for; n_images (below) may be fewer
+  n_images?: number;
+  // P1-04: only method=pgd, n_images>=50 and eps including 1 satisfies the passport protocol.
+  protocol_compliant?: boolean;
   flip_rate?: Record<string, number>;
   psnr?: Record<string, number>;
   example?: {
@@ -95,6 +99,7 @@ export type Passport = {
     formula: string;
     crash_test_id: number;
     tested_at: string;
+    n_requested: number;
     n_images: number;
     method: AttackMethod;
     pathology: string;
@@ -122,6 +127,7 @@ export type Passport = {
   verdict: Verdict;
   conditions: PassportCondition[];
   rules: { allow_score: number; shield_min_detection: number; shield_max_false_alarms: number };
+  protocol: { method: AttackMethod; min_images: number; eps_required: number[] };
   note: string;
 };
 

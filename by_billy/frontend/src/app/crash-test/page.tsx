@@ -13,7 +13,9 @@ import { CrashTestIcon } from "@/components/icons";
 
 const d = dictionary.crash;
 const EPS = [0.5, 1, 2, 4];
-const IMAGE_COUNTS = [10, 25, 50];
+// P1-04: the passport protocol requires >=50 images, so smaller demo-only counts are gone —
+// every option here can actually produce a passport-eligible result.
+const IMAGE_COUNTS = [50, 100];
 
 export default function CrashTestPage() {
   const { t } = useLanguage();
@@ -21,7 +23,8 @@ export default function CrashTestPage() {
   const [models, setModels] = useState<AiModel[]>([]);
   const [modelId, setModelId] = useState<number | null>(null);
   const [nImages, setNImages] = useState(50);
-  const [method, setMethod] = useState<AttackMethod>("fgsm");
+  // P1-04: pgd is the honest default — fgsm under-reports how easily the model flips.
+  const [method, setMethod] = useState<AttackMethod>("pgd");
   const [jobId, setJobId] = useState<number | null>(null);
   const [job, setJob] = useState<CrashTestJob | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -195,8 +198,17 @@ export default function CrashTestPage() {
                 <span className="text-2xl text-muted"> / 10</span>
               </p>
               <p className="mt-3 text-xs text-muted">{t(d.scoreFormula)}</p>
+              {job.protocol_compliant !== true && (
+                <p className="mt-3 rounded-lg bg-amber-100 px-3 py-2 text-xs text-amber-900">
+                  {t(d.protocolNotMet)}
+                </p>
+              )}
               <div className="mt-auto space-y-2 pt-6">
-                <Button onClick={createPassport} disabled={creating} className="w-full">
+                <Button
+                  onClick={createPassport}
+                  disabled={creating || job.protocol_compliant !== true}
+                  className="w-full"
+                >
                   {creating && <Spinner />}
                   {t(d.createPassport)}
                 </Button>

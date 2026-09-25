@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.auth import require_admin
 from app.db import get_session
 from app.models import AIModel, CrashTest, Passport, iso_utc
 from app.passport import pdf, report
@@ -35,7 +36,7 @@ def _get(session: Session, passport_id: int) -> Passport:
     return p
 
 
-@router.post("/passport", status_code=201)
+@router.post("/passport", status_code=201, dependencies=[Depends(require_admin)])
 def issue_passport(body: PassportIn, session: Session = Depends(get_session)):
     m = session.get(AIModel, body.model_id)
     if m is None:
@@ -54,6 +55,17 @@ def issue_passport(body: PassportIn, session: Session = Depends(get_session)):
             raise HTTPException(404, "Crash test not found for this model")
         if ct.robustness_score is None:
             raise HTTPException(409, "Crash test is not finished")
+
+    # P1-04: only a crash test that actually ran the passport protocol may certify against it.
+    ct_data = json.loads(ct.results_json)
+    if not report.protocol_compliant(ct_data):
+        raise HTTPException(
+            409,
+            "Crash test does not meet the passport protocol "
+            f"(need method={report.PROTOCOL['method']!r}, n_images>={report.PROTOCOL['min_images']}, "
+            f"eps includes {report.PROTOCOL['eps_required']}; got method={ct_data.get('method')!r}, "
+            f"n_images={ct_data.get('n_images')}, eps={ct_data.get('eps')})",
+        )
 
     data = report.build(session, m, ct)
     p = Passport(

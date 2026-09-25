@@ -9,18 +9,23 @@ from app import db
 from app.config import settings
 from app.models import CrashTest
 from app.passport import report
+from tests.conftest import admin_headers
 
 FLIP_RATE = {"0.5": 0.32, "1": 0.98, "2": 1.0, "4": 1.0}
 
 
-def add_crash_test(model_id: int, score: float | None = 0.2) -> int:
+def add_crash_test(model_id: int, score: float | None = 0.2, **overrides) -> int:
     results = {
         "n_images": 50, "method": "pgd", "pathology": "Pneumonia", "data": ["nih/normal"],
         "eps": [0.5, 1, 2, 4], "flip_rate": FLIP_RATE, "psnr": dict.fromkeys(FLIP_RATE, 50.0),
         "robustness_score": score,
     }
+    results.update(overrides)
     with db.SessionLocal() as session:
-        row = CrashTest(model_id=model_id, n_images=50, results_json=json.dumps(results), robustness_score=score)
+        row = CrashTest(
+            model_id=model_id, n_images=results["n_images"], results_json=json.dumps(results),
+            robustness_score=score,
+        )
         session.add(row)
         session.commit()
         return row.id
@@ -44,18 +49,42 @@ def test_verdict_rules(score, shield_ok, verdict):
     assert (report.SHIELD_REQUIRED in conditions) == (verdict == "allowed_with_conditions")
 
 
+def test_passport_requires_admin_token(client, model_id):
+    """P1-04: issuing a passport is an admin-only, credentialed action."""
+    ct = add_crash_test(model_id)
+    assert client.post("/api/passport", json={"model_id": model_id, "crash_test_id": ct}).status_code == 401
+    assert client.post(
+        "/api/passport", json={"model_id": model_id, "crash_test_id": ct}, headers={"Authorization": "Bearer wrong"}
+    ).status_code == 401
+
+
+@pytest.mark.parametrize("overrides,why", [
+    ({"method": "fgsm"}, "wrong method"),
+    ({"n_images": 49}, "too few images"),
+    ({"eps": [0.5, 2, 4]}, "eps 1 missing"),
+])
+def test_passport_refuses_non_compliant_crash_test(client, model_id, overrides, why):
+    """P1-04: a passport may only certify against the protocol the crash test actually ran."""
+    ct = add_crash_test(model_id, **overrides)
+    r = client.post(
+        "/api/passport", json={"model_id": model_id, "crash_test_id": ct}, headers=admin_headers()
+    )
+    assert r.status_code == 409, why
+    assert "protocol" in r.json()["detail"].lower()
+
+
 def test_needs_a_finished_crash_test(client, model_id):
-    assert client.post("/api/passport", json={"model_id": model_id}).status_code == 409
-    assert client.post("/api/passport", json={"model_id": 999}).status_code == 404
+    assert client.post("/api/passport", json={"model_id": model_id}, headers=admin_headers()).status_code == 409
+    assert client.post("/api/passport", json={"model_id": 999}, headers=admin_headers()).status_code == 404
     unfinished = add_crash_test(model_id, score=None)
-    r = client.post("/api/passport", json={"model_id": model_id, "crash_test_id": unfinished})
+    r = client.post("/api/passport", json={"model_id": model_id, "crash_test_id": unfinished}, headers=admin_headers())
     assert r.status_code == 409
-    assert client.post("/api/passport", json={"model_id": model_id, "crash_test_id": 999}).status_code == 404
+    assert client.post("/api/passport", json={"model_id": model_id, "crash_test_id": 999}, headers=admin_headers()).status_code == 404
 
 
 def test_issue_and_read(client, model_id, device):
     ct = add_crash_test(model_id)
-    r = client.post("/api/passport", json={"model_id": model_id, "organisation": " Namangan viloyat shifoxonasi "})
+    r = client.post("/api/passport", json={"model_id": model_id, "organisation": " Namangan viloyat shifoxonasi "}, headers=admin_headers())
     assert r.status_code == 201
     p = r.json()
     assert p["organisation"] == "Namangan viloyat shifoxonasi"
@@ -69,8 +98,6 @@ def test_issue_and_read(client, model_id, device):
     assert p["note"]
 
     # frozen: later activity does not rewrite an issued passport
-    from tests.conftest import admin_headers
-
     assert client.post("/api/devices", json={"name": "KT-02"}, headers=admin_headers()).status_code == 201
     assert client.get(f"/api/passport/{p['id']}").json() == p
 
@@ -82,7 +109,7 @@ def test_issue_and_read(client, model_id, device):
 def test_not_allowed_without_shield(client, model_id, tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "shield_calibration", tmp_path / "missing.json")
     add_crash_test(model_id)
-    p = client.post("/api/passport", json={"model_id": model_id}).json()
+    p = client.post("/api/passport", json={"model_id": model_id}, headers=admin_headers()).json()
     assert p["shield"] == {"available": False, "compatible": False}
     assert p["verdict"] == "not_allowed" and p["conditions"] == ["retest_required"]
 
@@ -90,7 +117,7 @@ def test_not_allowed_without_shield(client, model_id, tmp_path, monkeypatch):
 @pytest.mark.parametrize("lang", ["uz", "ru"])
 def test_pdf(client, model_id, lang):
     add_crash_test(model_id)
-    pid = client.post("/api/passport", json={"model_id": model_id, "organisation": "Oʻzbekiston"}).json()["id"]
+    pid = client.post("/api/passport", json={"model_id": model_id, "organisation": "Oʻzbekiston"}, headers=admin_headers()).json()["id"]
     r = client.get(f"/api/passport/{pid}/pdf", params={"lang": lang})
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/pdf"
@@ -100,7 +127,7 @@ def test_pdf(client, model_id, lang):
 
 def test_pdf_rejects_unknown_language(client, model_id):
     add_crash_test(model_id)
-    pid = client.post("/api/passport", json={"model_id": model_id}).json()["id"]
+    pid = client.post("/api/passport", json={"model_id": model_id}, headers=admin_headers()).json()["id"]
     assert client.get(f"/api/passport/{pid}/pdf", params={"lang": "en"}).status_code == 422
 
 

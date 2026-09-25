@@ -93,6 +93,7 @@ def run(
     progress(1.0)
 
     return {
+        "n_requested": n_images,
         "n_images": len(x),
         "method": method,
         "pathology": pathology,

@@ -21,6 +21,20 @@ SHIELD_MIN_DETECTION = 0.9
 SHIELD_MAX_FALSE_ALARMS = 0.02
 SCORE_FORMULA = "10 × (1 − flip rate at eps = 1 px)"
 
+# P1-04: a passport may only be issued from a crash test that actually ran the protocol it
+# claims to certify against — otherwise a cheap FGSM run on a handful of images could pass for
+# the real thing. Torch-free on purpose (this module must not gain a hard torch dependency —
+# passports are issued from a finished DB row, no model load required).
+PROTOCOL = {"method": "pgd", "min_images": 50, "eps_required": [1]}
+
+
+def protocol_compliant(result: dict) -> bool:
+    return (
+        result.get("method") == PROTOCOL["method"]
+        and result.get("n_images", 0) >= PROTOCOL["min_images"]
+        and all(e in result.get("eps", []) for e in PROTOCOL["eps_required"])
+    )
+
 VERDICTS = ("allowed", "allowed_with_conditions", "not_allowed")
 # Condition codes; texts live in the frontend dictionary and in passport/i18n.py for the PDF.
 SHIELD_REQUIRED = "shield_required"      # every image goes through the shield before the model
@@ -40,6 +54,7 @@ def robustness_block(ct: CrashTest) -> dict:
         "formula": SCORE_FORMULA,
         "crash_test_id": ct.id,
         "tested_at": iso_utc(ct.created_at),
+        "n_requested": r.get("n_requested", r["n_images"]),
         "n_images": r["n_images"],
         "method": r["method"],
         "pathology": r["pathology"],
@@ -106,5 +121,6 @@ def build(session: Session, m: AIModel, ct: CrashTest) -> dict:
             "shield_min_detection": SHIELD_MIN_DETECTION,
             "shield_max_false_alarms": SHIELD_MAX_FALSE_ALARMS,
         },
+        "protocol": PROTOCOL,
         "note": DOCTOR_NOTE,
     }

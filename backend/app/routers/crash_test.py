@@ -14,8 +14,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app import db
+from app.auth import require_admin
 from app.db import get_session
 from app.models import AIModel, CrashTest, iso_utc
+from app.passport.report import protocol_compliant
 
 router = APIRouter(tags=["crash-test"])
 log = logging.getLogger(__name__)
@@ -76,7 +78,7 @@ def _run_job(job_id: int, body: CrashTestIn) -> None:
     job.update(status="done", progress=1.0)
 
 
-@router.post("/crash-test", status_code=202)
+@router.post("/crash-test", status_code=202, dependencies=[Depends(require_admin)])
 def start_crash_test(body: CrashTestIn, background: BackgroundTasks, session: Session = Depends(get_session)):
     m = session.get(AIModel, body.model_id)
     if m is None:
@@ -105,7 +107,9 @@ def crash_test_status(job_id: int, session: Session = Depends(get_session)):
         raise HTTPException(404, "Crash test not found")
     base = {"job_id": row.id, "model_id": row.model_id, "created_at": iso_utc(row.created_at)}
     if row.robustness_score is not None:
-        return base | {"status": "done", "progress": 1.0} | json.loads(row.results_json)
+        data = json.loads(row.results_json)
+        data.setdefault("n_requested", data.get("n_images", 0))
+        return base | {"status": "done", "progress": 1.0, "protocol_compliant": protocol_compliant(data)} | data
     job = _jobs.get(job_id) or {"status": "error", "progress": 0.0, "error": "Job was interrupted (server restarted)"}
     return base | job
 
@@ -120,5 +124,9 @@ def list_crash_tests(model_id: int | None = None, session: Session = Depends(get
     for row in session.scalars(q):
         r = json.loads(row.results_json)
         r.pop("example", None)
-        out.append({"job_id": row.id, "model_id": row.model_id, "created_at": iso_utc(row.created_at)} | r)
+        r.setdefault("n_requested", r.get("n_images", 0))
+        out.append(
+            {"job_id": row.id, "model_id": row.model_id, "created_at": iso_utc(row.created_at),
+             "protocol_compliant": protocol_compliant(r)} | r
+        )
     return out

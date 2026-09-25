@@ -95,12 +95,28 @@ const realApi = {
   },
 
   getModels: () => request<AiModel[]>("/models"),
+  // Admin actions (P1-04) go through Next.js route handlers that add the admin token
+  // server-side, same reasoning as seal() above — never a bearer token in the browser.
   startCrashTest: (body: CrashTestRequest) =>
-    post<{ job_id: number }>("/crash-test", body),
+    fetch("/api/crash-test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then(
+      async (res) => {
+        const text = await res.text();
+        if (!res.ok) throw new ApiError(res.status, detailOf(text) || res.statusText);
+        return JSON.parse(text) as { job_id: number };
+      }
+    ),
   getCrashTest: (jobId: number) => request<CrashTestJob>(`/crash-test/${jobId}`),
 
   createPassport: (modelId: number, crashTestId: number) =>
-    post<Passport>("/passport", { model_id: modelId, crash_test_id: crashTestId }),
+    fetch("/api/passport", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model_id: modelId, crash_test_id: crashTestId }),
+    }).then(async (res) => {
+      const text = await res.text();
+      if (!res.ok) throw new ApiError(res.status, detailOf(text) || res.statusText);
+      return JSON.parse(text) as Passport;
+    }),
   getPassport: (id: number) => request<Passport>(`/passport/${id}`),
   // The backend PDF exists in Uzbek and Russian; English UI gets the Uzbek PDF.
   passportPdfUrl: (id: number, lang: "uz" | "ru" | "en") =>
