@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react";
 import PageShell from "@/components/PageShell";
 import { Button, Card, DoctorNote, ErrorBox, Field, Spinner, buttonClass, errorMessage } from "@/components/ui";
 import { useLanguage } from "@/lib/language-context";
-import dictionary from "@/lib/dictionary";
+import dictionary, { localeOf } from "@/lib/dictionary";
 import { api } from "@/lib/api";
 import type { Passport, Verdict } from "@/lib/types";
 import { PassportIcon } from "@/components/icons";
@@ -52,7 +52,7 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
       {error && <ErrorBox message={error} onRetry={retry} />}
 
       {!passport && !error && (
-        <p className="flex items-center gap-2 text-sm text-muted">
+        <p role="status" className="flex items-center gap-2 text-sm text-muted">
           <Spinner /> {t(dictionary.common.loading)}
         </p>
       )}
@@ -91,7 +91,7 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
                 <Field label={t(d.crashTest)} value={passport.crash_test_id} />
                 <Field
                   label={t(d.date)}
-                  value={new Date(passport.created_at).toLocaleDateString(lang === "ru" ? "ru-RU" : "uz-UZ")}
+                  value={new Date(passport.created_at).toLocaleDateString(localeOf(lang))}
                 />
               </div>
             </div>

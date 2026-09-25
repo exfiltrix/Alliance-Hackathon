@@ -3,7 +3,7 @@
 import { useState } from "react";
 import PageShell from "@/components/PageShell";
 import UploadDropzone from "@/components/UploadDropzone";
-import { Button, Card, DoctorNote, ErrorBox, Field, Spinner, errorMessage } from "@/components/ui";
+import { Button, Card, DoctorNote, ErrorBox, Field, ProgressBar, Spinner, errorMessage } from "@/components/ui";
 import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
 import { USE_MOCK, api, pngSrc } from "@/lib/api";
@@ -56,7 +56,7 @@ export default function VerifyPage() {
         <div className="space-y-4">
           <UploadDropzone file={file} onFile={onFile} disabled={loading} />
           {loading && (
-            <p className="flex items-center gap-2 text-sm text-muted">
+            <p role="status" className="flex items-center gap-2 text-sm text-muted">
               <Spinner /> {t(d.checking)}
             </p>
           )}
@@ -72,7 +72,7 @@ export default function VerifyPage() {
 
       {result && (
         <div className="space-y-6">
-          <div className={`rounded-2xl border p-5 ${statusStyle[result.status]}`}>
+          <div role="status" className={`rounded-2xl border p-5 ${statusStyle[result.status]}`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xl font-semibold">{t(d.status[result.status].title)}</p>
               {result.status !== "unsigned" && (
@@ -90,12 +90,16 @@ export default function VerifyPage() {
               <div className="flex justify-center overflow-hidden rounded-xl bg-black">
                 <div className="relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={pngSrc(result.preview_png)} alt="" className="block max-h-[480px] w-auto max-w-full" />
+                  <img
+                    src={pngSrc(result.preview_png)}
+                    alt={`${t(d.preview)}: ${t(d.status[result.status].title)}`}
+                    className="block max-h-[480px] w-auto max-w-full"
+                  />
                   {result.detective && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={pngSrc(result.detective.heatmap_png)}
-                      alt=""
+                      alt={t(d.heatmap)}
                       className="pointer-events-none absolute inset-0 h-full w-full opacity-70 mix-blend-screen"
                     />
                   )}
@@ -127,11 +131,8 @@ export default function VerifyPage() {
                   <p className="text-3xl font-semibold">
                     {Math.round(result.detective.probability * 100)}%
                   </p>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                    <div
-                      className="h-full rounded-full bg-amber-500"
-                      style={{ width: `${result.detective.probability * 100}%` }}
-                    />
+                  <div className="mt-2">
+                    <ProgressBar value={result.detective.probability} label={t(d.detectiveLabel)} color="bg-amber-500" />
                   </div>
                   <p className="mt-3 text-xs text-muted">{t(d.detectiveNote)}</p>
                 </Card>

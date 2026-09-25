@@ -32,7 +32,7 @@ export default function Home() {
     <div className="flex flex-1 flex-col">
       <Header />
 
-      <main className="flex-1">
+      <main id="main" tabIndex={-1} className="flex-1 outline-none">
         {/* Hero */}
         <section className="mx-auto max-w-6xl px-6 pt-16 text-center sm:pt-24">
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-white/70 px-4 py-1.5 text-xs font-medium text-muted">

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
 import LanguageSwitch from "./LanguageSwitch";
+import AccessibilityPanel from "./AccessibilityPanel";
 import { ChartIcon, CrashTestIcon, SealIcon, VerifyIcon } from "./icons";
 
 const links = [
@@ -28,7 +29,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-white/60 bg-background/70 backdrop-blur-xl print:hidden">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
         <Link href="/" className="flex items-center gap-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-foreground text-white">
             <SealIcon width={18} height={18} />
@@ -36,7 +37,7 @@ export default function Header() {
           <span className="text-lg font-semibold tracking-tight">MedSeal</span>
         </Link>
 
-        <nav className="hidden items-center gap-1 rounded-full border border-white/70 bg-white/40 p-1 text-sm font-medium md:flex">
+        <nav aria-label={t(dictionary.nav.menu)} className="hidden items-center gap-1 rounded-full border border-white/70 bg-white/40 p-1 text-sm font-medium md:flex">
           {links.map((l) => {
             const Icon = l.icon;
             const active = isActive(l);
@@ -50,6 +51,7 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-2">
+          <AccessibilityPanel />
           <LanguageSwitch />
           <Link
             href="/seal"
@@ -60,7 +62,7 @@ export default function Header() {
         </div>
       </div>
 
-      <nav className="flex gap-1 overflow-x-auto px-3 pb-2.5 text-sm font-medium md:hidden">
+      <nav aria-label={t(dictionary.nav.menu)} className="flex gap-1 overflow-x-auto px-3 pb-2.5 text-sm font-medium md:hidden">
         {links.map((l) => {
           const Icon = l.icon;
           const active = isActive(l);

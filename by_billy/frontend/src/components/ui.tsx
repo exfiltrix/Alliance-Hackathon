@@ -25,20 +25,36 @@ export const buttonClass = (variant: ButtonProps["variant"] = "dark") =>
         : "border border-border bg-white text-foreground hover:bg-accent-soft/50"
   }`;
 
-export function Button({ variant, className = "", ...props }: ButtonProps) {
-  return <button {...props} className={`${buttonClass(variant)} ${className}`} />;
+export function Button({ variant, className = "", type = "button", ...props }: ButtonProps) {
+  return <button type={type} {...props} className={`${buttonClass(variant)} ${className}`} />;
+}
+
+export function ProgressBar({ value, label, color = "bg-accent" }: { value: number; label: string; color?: string }) {
+  const pct = Math.round(Math.min(1, Math.max(0, value)) * 100);
+  return (
+    <div
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={pct}
+      className="h-2 overflow-hidden rounded-full bg-slate-100"
+    >
+      <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${pct}%` }} />
+    </div>
+  );
 }
 
 export function Spinner() {
   return (
-    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+    <span aria-hidden className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
   );
 }
 
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
   const { t } = useLanguage();
   return (
-    <div className="rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
+    <div role="alert" className="rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm text-danger">
       <p className="font-semibold">{t(dictionary.common.error)}</p>
       <p className="mt-1 break-words text-danger/80">{message}</p>
       {onRetry && (
@@ -54,7 +70,7 @@ export function DoctorNote() {
   const { t } = useLanguage();
   return (
     <p className="flex items-center gap-2 text-sm text-muted">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
         <path d="M12 8v4M12 16h.01" />
       </svg>

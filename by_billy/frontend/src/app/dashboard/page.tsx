@@ -48,7 +48,7 @@ export default function DashboardPage() {
       {error && <ErrorBox message={error} onRetry={retry} />}
 
       {!stats && !error && (
-        <p className="flex items-center gap-2 text-sm text-muted">
+        <p role="status" className="flex items-center gap-2 text-sm text-muted">
           <Spinner /> {t(dictionary.common.loading)}
         </p>
       )}

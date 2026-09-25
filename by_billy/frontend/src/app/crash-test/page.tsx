@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import PageShell from "@/components/PageShell";
 import FlipRateChart from "@/components/FlipRateChart";
-import { Button, Card, DoctorNote, ErrorBox, Spinner, errorMessage } from "@/components/ui";
+import { Button, Card, DoctorNote, ErrorBox, ProgressBar, Spinner, errorMessage } from "@/components/ui";
 import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
 import { api, pngSrc } from "@/lib/api";
@@ -20,17 +20,21 @@ function Segmented<T extends string | number>({
   value,
   onChange,
   disabled,
+  label,
 }: {
+  label: string;
   options: { value: T; label: string }[];
   value: T;
   onChange: (v: T) => void;
   disabled?: boolean;
 }) {
   return (
-    <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
+    <div role="group" aria-label={label} className="flex gap-1 rounded-xl bg-slate-100 p-1">
       {options.map((o) => (
         <button
           key={String(o.value)}
+          type="button"
+          aria-pressed={value === o.value}
           disabled={disabled}
           onClick={() => onChange(o.value)}
           className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
@@ -136,6 +140,7 @@ export default function CrashTestPage() {
             <div>
               <p className="mb-2 text-sm font-medium">{t(d.images)}</p>
               <Segmented
+                label={t(d.images)}
                 options={IMAGE_COUNTS.map((n) => ({ value: n, label: String(n) }))}
                 value={nImages}
                 onChange={setNImages}
@@ -145,6 +150,7 @@ export default function CrashTestPage() {
             <div>
               <p className="mb-2 text-sm font-medium">{t(d.method)}</p>
               <Segmented<AttackMethod>
+                label={t(d.method)}
                 options={[
                   { value: "fgsm", label: t(d.fgsm) },
                   { value: "pgd", label: t(d.pgd) },
@@ -158,14 +164,11 @@ export default function CrashTestPage() {
 
           {running ? (
             <div>
-              <p className="flex items-center gap-2 text-sm text-muted">
+              <p role="status" className="flex items-center gap-2 text-sm text-muted">
                 <Spinner /> {t(d.running)} {Math.round((job?.progress ?? 0) * 100)}%
               </p>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-accent transition-all"
-                  style={{ width: `${(job?.progress ?? 0) * 100}%` }}
-                />
+              <div className="mt-2">
+                <ProgressBar value={job?.progress ?? 0} label={t(d.running)} />
               </div>
             </div>
           ) : (
@@ -183,7 +186,7 @@ export default function CrashTestPage() {
       )}
 
       {done && job && (
-        <div className="space-y-6">
+        <div role="region" aria-live="polite" aria-label={t(d.scoreTitle)} className="space-y-6">
           {job.example && (
             <Card>
               <p className="text-sm font-semibold">{t(d.beforeAfter)}</p>
@@ -211,7 +214,7 @@ export default function CrashTestPage() {
             <Card>
               <p className="text-sm font-semibold">{t(d.chartTitle)}</p>
               <p className="mb-6 text-xs text-muted">{t(d.chartAxis)}</p>
-              <FlipRateChart flipRate={job.flip_rate} psnr={job.psnr} psnrLabel={t(d.psnr)} />
+              <FlipRateChart flipRate={job.flip_rate} psnr={job.psnr} psnrLabel={t(d.psnr)} caption={t(d.chartTitle)} epsLabel={t(d.attackStrength)} />
             </Card>
 
             <Card className="flex flex-col">

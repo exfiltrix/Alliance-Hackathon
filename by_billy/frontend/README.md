@@ -26,4 +26,5 @@ Contract: `../docs/API.md`. The TypeScript types in `src/lib/types.ts` match it 
 | `src/app/crash-test` | Attack a model, flip-rate chart, robustness score → passport |
 | `src/app/passport/[id]` | Model passport, PDF / print |
 | `src/app/dashboard` | Stats |
-| `src/lib/dictionary.ts` | All UI strings, Uzbek (default) + Russian |
+| `src/lib/dictionary.ts` | All UI strings: Uzbek (default), Russian, English — TypeScript fails the build if a translation is missing |
+| `src/components/AccessibilityPanel.tsx`, `src/lib/a11y.ts` | Accessibility panel: text size, high contrast, dark (inverted) mode, greyscale, spacing, link highlighting, no animations, read aloud |

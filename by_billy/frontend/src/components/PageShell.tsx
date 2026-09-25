@@ -37,7 +37,7 @@ export default function PageShell({
   return (
     <div className="flex flex-1 flex-col">
       <Header />
-      <main className="flex-1">
+      <main id="main" tabIndex={-1} className="flex-1 outline-none">
         <section className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
           <div className="flex flex-wrap items-center gap-3 print:hidden">
             <button
@@ -49,12 +49,12 @@ export default function PageShell({
               </svg>
               {t(dictionary.common.back)}
             </button>
-            <nav aria-label="breadcrumb" className="flex items-center gap-1.5 text-sm text-muted">
+            <nav aria-label={t(dictionary.common.breadcrumb)} className="flex items-center gap-1.5 text-sm text-muted">
               <Link href="/" className="hover:text-foreground">
                 {t(dictionary.nav.home)}
               </Link>
               <span>/</span>
-              <span className="text-foreground">{title}</span>
+              <span aria-current="page" className="text-foreground">{title}</span>
             </nav>
           </div>
 

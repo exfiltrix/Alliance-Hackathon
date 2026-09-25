@@ -57,6 +57,25 @@ export function ShieldIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+export function AccessibilityIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="10" />
+      <circle cx="12" cy="7" r="1.3" fill="currentColor" />
+      <path d="M7 10l5 1 5-1M12 11v3.5M12 14.5L9.5 18.5M12 14.5l2.5 4" />
+    </svg>
+  );
+}
+
+export function SpeakerIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M11 5L6 9H3v6h3l5 4z" />
+      <path d="M15.5 8.5a5 5 0 010 7M18.5 5.5a9 9 0 010 13" />
+    </svg>
+  );
+}
+
 export function ChartIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>

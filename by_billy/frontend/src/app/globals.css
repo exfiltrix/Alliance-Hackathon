@@ -3,7 +3,7 @@
 :root {
   --background: #eef1fb;
   --foreground: #12131a;
-  --muted: #6b7086;
+  --muted: #555a70;
   --surface: #ffffff;
   --accent: #3457ff;
   --accent-soft: #e3e9ff;
@@ -73,6 +73,82 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .fade-up {
     animation: none;
+  }
+}
+
+/* ---------- Accessibility modes (set on <html> by src/lib/a11y.ts) ---------- */
+
+html[data-font="1"] {
+  font-size: 118.75%;
+}
+html[data-font="2"] {
+  font-size: 137.5%;
+}
+
+html[data-contrast="high"] {
+  --background: #ffffff;
+  --foreground: #000000;
+  --muted: #1a1a1a;
+  --surface: #ffffff;
+  --accent: #0033cc;
+  --accent-soft: #e6ecff;
+  --ok: #006b21;
+  --danger: #b00000;
+  --border: #000000;
+}
+html[data-contrast="high"] body::before {
+  display: none;
+}
+html[data-contrast="high"] .glass {
+  background: #ffffff;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 2px solid #000000;
+}
+html[data-contrast="high"] :is(.border, [class*="border-"]):not(.animate-spin) {
+  border-color: #000000;
+}
+
+html[data-contrast="invert"] {
+  filter: invert(1) hue-rotate(180deg);
+}
+html[data-gray] {
+  filter: grayscale(1);
+}
+html[data-contrast="invert"][data-gray] {
+  filter: invert(1) hue-rotate(180deg) grayscale(1);
+}
+/* Medical images must keep their real look under the inverted theme. */
+html[data-contrast="invert"] :is(img, video) {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+html[data-spacing] body :is(p, li, label, span, a, button, dd, dt, td, th, input, select) {
+  letter-spacing: 0.05em !important;
+  word-spacing: 0.12em !important;
+  line-height: 1.75 !important;
+}
+
+html[data-links] :is(a, button) {
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+}
+html[data-links] a:hover {
+  background: #fff3a0;
+  color: #000;
+}
+
+html[data-reduce-motion] *,
+html[data-reduce-motion] *::before,
+html[data-reduce-motion] *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+
+@media print {
+  html {
+    filter: none !important;
   }
 }
 

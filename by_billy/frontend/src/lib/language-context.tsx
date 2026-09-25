@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useContext, useMemo, useSyncExternalStore, type ReactNode } from "react";
-import { DEFAULT_LANG, type Lang } from "./dictionary";
+import { DEFAULT_LANG, LANGS, type Lang } from "./dictionary";
+import { LANG_KEY } from "./a11y-init";
 
 type Entry = Record<Lang, string>;
 
@@ -13,7 +14,7 @@ type LanguageContextValue = {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-const STORAGE_KEY = "medseal-lang";
+const STORAGE_KEY = LANG_KEY;
 const listeners = new Set<() => void>();
 let memoryLang: Lang = DEFAULT_LANG;
 
@@ -29,7 +30,7 @@ function subscribe(cb: () => void) {
 function getSnapshot(): Lang {
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (stored === "uz" || stored === "ru") return stored;
+    if (LANGS.some((l) => l.code === stored)) return stored as Lang;
   } catch {
     // storage blocked — fall back to in-memory value
   }

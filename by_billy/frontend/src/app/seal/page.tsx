@@ -6,7 +6,7 @@ import PageShell from "@/components/PageShell";
 import UploadDropzone from "@/components/UploadDropzone";
 import { Button, Card, ErrorBox, Field, Spinner, buttonClass, errorMessage } from "@/components/ui";
 import { useLanguage } from "@/lib/language-context";
-import dictionary from "@/lib/dictionary";
+import dictionary, { localeOf } from "@/lib/dictionary";
 import { api, backendUrl } from "@/lib/api";
 import type { Device, SealResponse } from "@/lib/types";
 import { SealIcon } from "@/components/icons";
@@ -81,9 +81,9 @@ export default function SealPage() {
     <PageShell title={t(d.title)} subtitle={t(d.subtitle)} icon={SealIcon} step="seal">
       {result ? (
         <Card className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div role="status" className="flex flex-wrap items-center justify-between gap-3">
             <span className="inline-flex items-center gap-2 rounded-full bg-ok/10 px-4 py-1.5 text-sm font-semibold text-ok">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <svg aria-hidden width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
                 <path d="M5 12l5 5L20 7" />
               </svg>
               {t(d.sealed)}
@@ -93,7 +93,7 @@ export default function SealPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t(d.sealId)} value={`#${result.seal_id}`} />
-            <Field label={t(d.time)} value={new Date(result.created_at).toLocaleString(lang === "ru" ? "ru-RU" : "uz-UZ")} />
+            <Field label={t(d.time)} value={new Date(result.created_at).toLocaleString(localeOf(lang))} />
             <Field label={t(d.device)} value={device ? `${device.name} · ${device.hospital}` : `#${result.device_id}`} />
             <Field label={t(d.tiles)} value={result.tiles} />
             <Field label={t(d.uid)} value={result.uid} mono />
@@ -142,12 +142,14 @@ export default function SealPage() {
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder={t(d.deviceName)}
+                  aria-label={t(d.deviceName)}
                   className="w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-accent"
                 />
                 <input
                   value={newHospital}
                   onChange={(e) => setNewHospital(e.target.value)}
                   placeholder={t(d.hospital)}
+                  aria-label={t(d.hospital)}
                   className="w-full rounded-xl border border-border px-3 py-2 text-sm outline-none focus:border-accent"
                 />
                 <div className="flex gap-2">
@@ -160,7 +162,7 @@ export default function SealPage() {
                 </div>
               </div>
             ) : (
-              <button onClick={() => setAdding(true)} className="text-sm font-medium text-accent">
+              <button type="button" onClick={() => setAdding(true)} className="text-sm font-medium text-accent">
                 {t(d.addDevice)}
               </button>
             )}

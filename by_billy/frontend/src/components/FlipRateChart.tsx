@@ -4,15 +4,40 @@ export default function FlipRateChart({
   flipRate,
   psnr,
   psnrLabel,
+  caption,
+  epsLabel,
 }: {
   flipRate: Record<string, number>;
   psnr: Record<string, number>;
   psnrLabel: string;
+  caption: string;
+  epsLabel: string;
 }) {
   const eps = Object.keys(flipRate).sort((a, b) => Number(a) - Number(b));
 
   return (
     <div>
+      <table className="sr-only">
+        <caption>{caption}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{epsLabel} (eps)</th>
+            <th scope="col">{caption}</th>
+            <th scope="col">PSNR</th>
+          </tr>
+        </thead>
+        <tbody>
+          {eps.map((e) => (
+            <tr key={e}>
+              <th scope="row">{e}</th>
+              <td>{Math.round(flipRate[e] * 100)}%</td>
+              <td>{psnr[e] != null ? `${psnr[e].toFixed(1)} dB` : "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <div aria-hidden>
       <div className="relative mt-6 h-48">
         {[0, 50, 100].map((g) => (
           <div
@@ -54,6 +79,7 @@ export default function FlipRateChart({
         ))}
       </div>
       <p className="ml-8 mt-1 text-[10px] text-muted">{psnrLabel}</p>
+      </div>
     </div>
   );
 }
