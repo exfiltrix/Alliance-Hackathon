@@ -29,6 +29,8 @@ export type VerifyResponse = {
   changed_tiles: [number, number][];
   tile?: number | null;
   reason?: ForgedReason;
+  // Non-fatal: the device was revoked AFTER this seal was made, so it is still trusted.
+  warning?: "device_revoked_later";
   verify_ms?: number;
   preview_png: string;
   // null when the AI is off on the backend; the detective key only exists for unsigned images

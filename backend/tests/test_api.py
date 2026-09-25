@@ -141,12 +141,36 @@ def test_reseal_same_image_is_idempotent(client, device):
 
 
 def test_revoked_device(client, device):
+    """P0-2: revocation is not retroactive. A seal made before revoked_at stays trusted
+    (with a warning); a NEW seal from the same (now revoked) token/device is refused outright."""
     _, sealed = seal(client, device, xray_png())
     client.post(f"/api/devices/{device['id']}/revoke", headers=admin_headers())
+
     result = verify(client, sealed)
-    assert result["status"] == "forged" and result["reason"] == "device_revoked"
+    assert result["status"] == "authentic"
+    assert result["warning"] == "device_revoked_later"
+
     r = client.post("/api/seal", files={"file": ("x.png", xray_png(seed=5))}, headers=device["auth"])
     assert r.status_code == 403  # require_device rejects a revoked device's token before sealing
+
+
+def test_seal_made_after_revocation_is_forged(client, device):
+    """A row whose created_at is at/after revoked_at (e.g. the key was stolen and used, then the
+    theft was noticed and reported) must still be forged, unlike the case above."""
+    _, sealed = seal(client, device, xray_png())
+    from datetime import timedelta
+
+    from app import db
+    from app.models import Device, Seal, utcnow
+
+    with db.SessionLocal() as s:
+        # Backdate the revocation to before the seal was made, simulating a key compromised earlier.
+        s.get(Device, device["id"]).revoked_at = s.get(Seal, 1).created_at - timedelta(minutes=1)
+        s.get(Device, device["id"]).revoked = True
+        s.commit()
+
+    result = verify(client, sealed)
+    assert result["status"] == "forged" and result["reason"] == "device_revoked"
 
 
 def test_rejects_unknown_format(client, device):

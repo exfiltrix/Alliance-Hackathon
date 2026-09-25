@@ -85,6 +85,11 @@ export default function VerifyPage() {
             {result.status === "forged" && result.reason && (
               <p className="mt-1 text-sm font-medium">{t(d.forgedReasons[result.reason])}</p>
             )}
+            {result.warning && (
+              <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900">
+                <span className="font-semibold">{t(d.warning)}:</span> {t(d.warnings[result.warning])}
+              </p>
+            )}
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1fr_360px]">

@@ -27,6 +27,7 @@ class Device(Base):
     public_key_hex: Mapped[str] = mapped_column(String(64))
     token_hash: Mapped[str] = mapped_column(String(64), default="")  # sha256 of the bearer token; see app.auth
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 

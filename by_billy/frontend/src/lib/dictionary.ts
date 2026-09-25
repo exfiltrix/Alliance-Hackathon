@@ -444,6 +444,13 @@ const dictionary = {
       },
       unknown_device: { uz: "Qurilma noma'lum.", ru: "Устройство неизвестно.", en: "Unknown device." },
     },
+    warnings: {
+      device_revoked_later: {
+        uz: "Bu surat muhrlangandan keyin qurilma bekor qilingan. Muhr hali ham haqiqiy, lekin qurilmaga endi ishonib bo'lmaydi.",
+        ru: "Устройство было отозвано уже после печати этого снимка. Печать по-прежнему подлинная, но устройству больше нельзя доверять.",
+        en: "The device was revoked after this image was sealed. The seal is still authentic, but the device can no longer be trusted.",
+      },
+    },
     heatmap: { uz: "Issiqlik xaritasi", ru: "Тепловая карта", en: "Heatmap" },
     shieldTitle: { uz: "AI qalqon", ru: "AI-щит", en: "AI shield" },
     shieldClean: { uz: "Yashirin hujum aniqlanmadi", ru: "Скрытая атака не обнаружена", en: "No hidden attack detected" },
