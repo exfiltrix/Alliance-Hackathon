@@ -19,6 +19,7 @@ const dictionary = {
     dashboard: { uz: "Statistika", ru: "Статистика", en: "Statistics" },
     cta: { uz: "Boshlash", ru: "Начать", en: "Get started" },
     register: { uz: "Ro'yxatdan o'tish", ru: "Регистрация", en: "Sign up" },
+    logout: { uz: "Chiqish", ru: "Выйти", en: "Log out" },
     menu: { uz: "Asosiy menyu", ru: "Главное меню", en: "Main menu" },
     language: { uz: "Til", ru: "Язык", en: "Language" },
     skip: { uz: "Asosiy mazmunga o'tish", ru: "Перейти к содержимому", en: "Skip to main content" },
@@ -306,6 +307,7 @@ const dictionary = {
       en: "“{org}” is registered. You can now add devices and seal images.",
     },
     goSeal: { uz: "Muhrlashga o'tish", ru: "Перейти к печати", en: "Go to sealing" },
+    goDashboard: { uz: "Boshqaruv paneliga o'tish", ru: "Перейти в панель управления", en: "Go to dashboard" },
     again: { uz: "Yana ro'yxatdan o'tish", ru: "Зарегистрировать ещё раз", en: "Register another" },
     errors: {
       required: { uz: "Bu maydonni to'ldiring", ru: "Заполните это поле", en: "This field is required" },
@@ -319,6 +321,15 @@ const dictionary = {
       },
       passwordMismatch: { uz: "Parollar mos kelmadi", ru: "Пароли не совпадают", en: "Passwords don't match" },
     },
+  },
+  gate: {
+    title: { uz: "Avval ro'yxatdan o'ting", ru: "Сначала зарегистрируйтесь", en: "Register first" },
+    subtitle: {
+      uz: "Bu bo'lim faqat ro'yxatdan o'tgan foydalanuvchilar uchun ochiq.",
+      ru: "Этот раздел доступен только зарегистрированным пользователям.",
+      en: "This section is only available to registered users.",
+    },
+    cta: { uz: "Ro'yxatdan o'tish", ru: "Зарегистрироваться", en: "Sign up" },
   },
   seal: {
     title: { uz: "Suratni muhrlash", ru: "Печать снимка", en: "Seal an image" },

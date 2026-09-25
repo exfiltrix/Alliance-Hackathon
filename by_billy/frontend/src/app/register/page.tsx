@@ -6,6 +6,7 @@ import PageShell from "@/components/PageShell";
 import { Button, Card, Segmented, buttonClass } from "@/components/ui";
 import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
+import { login, logout } from "@/lib/auth";
 
 const d = dictionary.register;
 const e = dictionary.register.errors;
@@ -106,10 +107,16 @@ export default function RegisterPage() {
     // Demo only: no auth endpoint exists in docs/API.md yet, so this just simulates a request.
     await new Promise((r) => setTimeout(r, 600));
     setSubmitting(false);
+    login(
+      type === "legal"
+        ? { type: "legal", name: form.contactName, org: form.orgName }
+        : { type: "individual", name: form.fullName }
+    );
     setSuccessOrg(type === "legal" ? form.orgName : "");
   };
 
   const reset = () => {
+    logout();
     setForm(EMPTY);
     setErrors({});
     setSuccessOrg(null);
@@ -119,7 +126,7 @@ export default function RegisterPage() {
     const message =
       type === "legal" ? t(d.successLegal).replace("{org}", successOrg) : t(d.successIndividual);
     return (
-      <PageShell title={t(d.title)} subtitle={t(d.subtitle)}>
+      <PageShell title={t(d.title)} subtitle={t(d.subtitle)} publicPage>
         <Card className="max-w-lg space-y-4 text-center">
           <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-ok/10 text-ok">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
@@ -129,8 +136,8 @@ export default function RegisterPage() {
           <h2 className="text-xl font-semibold">{t(d.successTitle)}</h2>
           <p className="text-sm text-muted">{message}</p>
           <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-center">
-            <Link href="/seal" className={buttonClass("dark")}>
-              {t(d.goSeal)}
+            <Link href={type === "legal" ? "/dashboard" : "/seal"} className={buttonClass("dark")}>
+              {t(type === "legal" ? d.goDashboard : d.goSeal)}
             </Link>
             <Button variant="ghost" onClick={reset}>
               {t(d.again)}
@@ -142,7 +149,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <PageShell title={t(d.title)} subtitle={t(d.subtitle)}>
+    <PageShell title={t(d.title)} subtitle={t(d.subtitle)} publicPage>
       <form onSubmit={submit} noValidate className="max-w-lg space-y-6">
         <div>
           <p className="mb-2 text-sm font-medium">{t(d.typeLabel)}</p>
