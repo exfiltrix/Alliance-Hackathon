@@ -54,6 +54,14 @@ export default function Header() {
           <AccessibilityPanel />
           <LanguageSwitch />
           <Link
+            href="/register"
+            className={`hidden rounded-full border border-border px-3.5 py-2 text-sm font-medium transition-colors hover:bg-white sm:inline-flex ${
+              pathname.startsWith("/register") ? "bg-white text-foreground" : "text-muted"
+            }`}
+          >
+            {t(dictionary.nav.register)}
+          </Link>
+          <Link
             href="/seal"
             className="hidden rounded-full bg-foreground px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-foreground/90 lg:inline-flex"
           >
