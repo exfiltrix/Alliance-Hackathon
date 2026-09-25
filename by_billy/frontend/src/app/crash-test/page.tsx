@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import PageShell from "@/components/PageShell";
 import FlipRateChart from "@/components/FlipRateChart";
-import { Button, Card, DoctorNote, ErrorBox, ProgressBar, Spinner, errorMessage } from "@/components/ui";
+import { Button, Card, DoctorNote, ErrorBox, ProgressBar, Segmented, Spinner, errorMessage } from "@/components/ui";
 import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
 import { api, pngSrc } from "@/lib/api";
@@ -14,39 +14,6 @@ import { CrashTestIcon } from "@/components/icons";
 const d = dictionary.crash;
 const EPS = [0.5, 1, 2, 4];
 const IMAGE_COUNTS = [10, 25, 50];
-
-function Segmented<T extends string | number>({
-  options,
-  value,
-  onChange,
-  disabled,
-  label,
-}: {
-  label: string;
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div role="group" aria-label={label} className="flex gap-1 rounded-xl bg-slate-100 p-1">
-      {options.map((o) => (
-        <button
-          key={String(o.value)}
-          type="button"
-          aria-pressed={value === o.value}
-          disabled={disabled}
-          onClick={() => onChange(o.value)}
-          className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-            value === o.value ? "bg-white text-foreground shadow-sm" : "text-muted hover:text-foreground"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export default function CrashTestPage() {
   const { t } = useLanguage();
