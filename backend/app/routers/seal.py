@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth import require_device
+from app.automation.public_check import token_for
 from app.config import settings
 from app.db import get_session
 from app.models import Device, Seal, iso_utc
@@ -41,7 +42,7 @@ async def seal(
         row, elapsed_ms = seal_upload(session, image, device.id)
     except SealError as e:
         raise HTTPException(e.status, str(e)) from e
-    return seal_json(row) | {"seal_ms": round(elapsed_ms, 2)}
+    return seal_json(row) | {"seal_ms": round(elapsed_ms, 2), "check_token": token_for(session, row.id)}
 
 
 @router.get("/seal/{seal_id}/file")

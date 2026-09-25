@@ -99,3 +99,31 @@ class Passport(Base):
     organisation: Mapped[str] = mapped_column(String(300), default="")
     report_json: Mapped[str] = mapped_column(Text, default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PublicCheck(Base):
+    """Random, unguessable link token for the patient-facing QR check of one seal.
+    Kept outside the seals table so the ledger record (and its hash chain) is untouched."""
+
+    __tablename__ = "public_checks"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    token: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    seal_id: Mapped[int] = mapped_column(ForeignKey("seals.id"), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class InboxItem(Base):
+    """An image that reached the doctor and was checked automatically (upload or watched folder)."""
+
+    __tablename__ = "inbox_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    file_name: Mapped[str] = mapped_column(String(300))
+    source: Mapped[str] = mapped_column(String(16))  # upload | folder
+    status: Mapped[str] = mapped_column(String(16))  # authentic / tampered / unsigned / forged / error
+    severity: Mapped[str] = mapped_column(String(8), index=True)  # danger / warning / ok
+    reasons_json: Mapped[str] = mapped_column(Text, default="[]")  # why it needs attention (codes)
+    result_json: Mapped[str] = mapped_column(Text, default="{}")  # full /verify response, incl. preview
+    reviewed: Mapped[bool] = mapped_column(Boolean, default=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

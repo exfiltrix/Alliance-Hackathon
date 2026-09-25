@@ -15,6 +15,61 @@ export type SealResponse = {
   root: string;
   created_at: string;
   download_url: string;
+  check_token?: string; // patient QR check: /check/{check_token}
+};
+
+export type Severity = "danger" | "warning" | "ok";
+
+export type InboxReason =
+  | "tampered" | "forged" | "attack_suspected" | "unsigned" | "unreadable" | "device_revoked_later";
+
+export type InboxItem = {
+  id: number;
+  file_name: string;
+  source: "upload" | "folder";
+  received_at: string;
+  status: VerifyStatus | "error";
+  severity: Severity;
+  reasons: InboxReason[];
+  reviewed: boolean;
+  device: string | null;
+  changed_tiles: number;
+  detective_probability: number | null;
+  error: string | null;
+};
+
+export type InboxListing = {
+  counts: Record<Severity, number> & { total: number };
+  items: InboxItem[];
+};
+
+export type AutomationStatus = {
+  watching: boolean;
+  scanner_dir: string;
+  incoming_dir: string;
+  interval_s: number;
+  gateway: string;
+  sealed: number;
+  verified: number;
+  failed: number;
+  last_event: { at: string; text: string } | null;
+  warmup: boolean;
+};
+
+export type CheckInfo = {
+  status: "valid" | "warning" | "invalid";
+  reason: string | null;
+  hospital: string | null;
+  device: string | null;
+  sealed_at: string;
+  shape: number[];
+};
+
+export type CheckFileResult = {
+  status: VerifyStatus | "mismatch";
+  reason?: string | null;
+  changed_tiles?: number;
+  preview_png?: string;
 };
 
 export type VerifyStatus = "authentic" | "tampered" | "unsigned" | "forged";

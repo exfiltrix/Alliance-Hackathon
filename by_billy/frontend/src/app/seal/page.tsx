@@ -13,6 +13,10 @@ import { SealIcon } from "@/components/icons";
 
 const d = dictionary.seal;
 
+// The QR opens this site's public check page; built from the address the site is opened at,
+// so a phone on the same Wi-Fi can scan it.
+const checkPage = (token: string) => `${window.location.origin}/check/${token}`;
+
 export default function SealPage() {
   const { t, lang } = useLanguage();
   const [file, setFile] = useState<File | null>(null);
@@ -60,6 +64,28 @@ export default function SealPage() {
             <Field label={t(d.uid)} value={result.uid} mono />
             <Field label={t(d.root)} value={`${result.root.slice(0, 16)}…`} mono />
           </div>
+
+          {result.check_token && (
+            <div className="flex flex-col items-center gap-4 rounded-2xl border border-border bg-white/60 p-4 sm:flex-row">
+              {api.checkQrUrl(result.check_token, checkPage(result.check_token)) && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={api.checkQrUrl(result.check_token, checkPage(result.check_token))}
+                  alt={t(dictionary.sealQr.title)}
+                  width={144}
+                  height={144}
+                  className="h-36 w-36 rounded-lg bg-white"
+                />
+              )}
+              <div className="space-y-2 text-center sm:text-left">
+                <p className="text-sm font-semibold">{t(dictionary.sealQr.title)}</p>
+                <p className="text-xs text-muted">{t(dictionary.sealQr.desc)}</p>
+                <Link href={`/check/${result.check_token}`} target="_blank" className="text-sm font-medium text-accent">
+                  {t(dictionary.sealQr.open)} →
+                </Link>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <a href={backendUrl(result.download_url)} download={file?.name} className={buttonClass("dark")}>

@@ -101,3 +101,12 @@ export function PassportIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function InboxIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M4 13l2.5-7.5A2 2 0 018.4 4h7.2a2 2 0 011.9 1.5L20 13" />
+      <path d="M4 13v5a2 2 0 002 2h12a2 2 0 002-2v-5h-5l-1.5 2.5h-3L9 13z" />
+    </svg>
+  );
+}

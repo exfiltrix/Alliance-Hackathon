@@ -8,6 +8,7 @@ numpy>=2.0
 cryptography>=43
 pillow>=11
 fpdf2>=2.8  # passport PDF
+qrcode>=7.4  # patient QR check
 
 # tests
 pytest>=8

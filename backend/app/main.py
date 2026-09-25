@@ -6,7 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import db
 from app.config import settings
 from app.db import init_engine
-from app.routers import crash_test, devices, passport, seal, stats, verify
+from app.automation import warmup, watcher
+from app.routers import check, crash_test, devices, inbox, passport, seal, stats, verify
 
 
 @asynccontextmanager
@@ -14,7 +15,12 @@ async def lifespan(app: FastAPI):
     init_engine()
     with db.SessionLocal() as session:
         crash_test.seed_models(session)
+    if settings.warmup:
+        warmup.start()
+    if settings.watch_enabled:
+        watcher.start()
     yield
+    watcher.stop()
 
 
 app = FastAPI(title="MedSeal API", version="0.1.0", lifespan=lifespan)
@@ -27,7 +33,8 @@ app.add_middleware(
     expose_headers=["Content-Disposition"],
 )
 
-for r in (devices.router, seal.router, verify.router, crash_test.router, passport.router, stats.router):
+for r in (devices.router, seal.router, verify.router, inbox.router, check.router, crash_test.router, passport.router,
+          stats.router):
     app.include_router(r, prefix="/api")
 
 

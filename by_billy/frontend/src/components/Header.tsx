@@ -7,9 +7,10 @@ import dictionary from "@/lib/dictionary";
 import { logout, useAuth } from "@/lib/auth";
 import LanguageSwitch from "./LanguageSwitch";
 import AccessibilityPanel from "./AccessibilityPanel";
-import { ChartIcon, CrashTestIcon, SealIcon, VerifyIcon } from "./icons";
+import { ChartIcon, CrashTestIcon, InboxIcon, SealIcon, VerifyIcon } from "./icons";
 
 const ALL_LINKS = [
+  { href: "/inbox", key: "inbox", icon: InboxIcon },
   { href: "/seal", key: "seal", icon: SealIcon },
   { href: "/verify", key: "verify", icon: VerifyIcon },
   { href: "/crash-test", key: "crashTest", icon: CrashTestIcon, match: ["/crash-test", "/passport"] },
@@ -19,8 +20,8 @@ const ALL_LINKS = [
 // Individual accounts (doctors) only need to seal/verify their own images;
 // legal entities (hospitals, AI vendors) also certify models and see org stats.
 const LINKS_BY_TYPE = {
-  individual: ["seal", "verify"],
-  legal: ["seal", "verify", "crashTest", "dashboard"],
+  individual: ["inbox", "seal", "verify"],
+  legal: ["inbox", "seal", "verify", "crashTest", "dashboard"],
 } as const;
 
 export default function Header() {

@@ -1,6 +1,11 @@
 import type {
   AiModel,
+  AutomationStatus,
+  CheckFileResult,
+  CheckInfo,
   CrashTestJob,
+  InboxItem,
+  InboxListing,
   CrashTestRequest,
   Passport,
   SealResponse,
@@ -93,6 +98,28 @@ const realApi = {
     form.append("file", file);
     return post<VerifyResponse>("/verify", form);
   },
+
+  // Doctor's inbox: images are verified automatically, most urgent first.
+  uploadToInbox: (files: File[]) => {
+    const form = new FormData();
+    files.forEach((f) => form.append("files", f));
+    return post<InboxItem[]>("/inbox", form);
+  },
+  getInbox: () => request<InboxListing>("/inbox"),
+  getInboxItem: (id: number) => request<InboxItem & { result: VerifyResponse | { error: string } }>(`/inbox/${id}`),
+  reviewInboxItem: (id: number) => post<InboxItem>(`/inbox/${id}/review`, {}),
+  getAutomation: () => request<AutomationStatus>("/automation"),
+  runAutomation: () => post<{ sealed: number; verified: number }>("/automation/run", {}),
+
+  // Public QR check (no login): the page lives at /check/{token} on this site.
+  getCheck: (token: string) => request<CheckInfo>(`/check/${encodeURIComponent(token)}`),
+  checkFile: (token: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return post<CheckFileResult>(`/check/${encodeURIComponent(token)}`, form);
+  },
+  checkQrUrl: (token: string, pageUrl: string) =>
+    `${API_BASE_URL}/check/${encodeURIComponent(token)}/qr.png?url=${encodeURIComponent(pageUrl)}`,
 
   getModels: () => request<AiModel[]>("/models"),
   startCrashTest: (body: CrashTestRequest) =>

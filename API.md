@@ -67,6 +67,32 @@ there is no `device_id` field anymore (a client can no longer seal as an arbitra
 - `shield.score` is a distance, not a percentage (clean X-rays ≈ 3–8, attacked ≈ 10–100+); `attack_suspected = score > threshold`. Show it as "Yashirin hujum aniqlandi" / "Shubhali shovqin topilmadi" plus `score / threshold`, not as "87%". About 1% of clean images raise a false alarm, so it is a warning, not a verdict. Takes ~50 ms (first call after startup ~2 s: model load).
 - UI labels: `authentic`/`tampered`/`forged` are certain ("Tasdiqlangan"); `detective` is a probability ("Ehtimollik 87%"), `shield` is a warning (see above).
 
+## Automation (no clicks)
+Folders (backend setting `MEDSEAL_WATCH_DIR`, default `data/watch`), polled every 2 s while the backend runs (`MEDSEAL_WATCH=0` turns it off):
+- `scanner/` — the X-ray machine drops files here → sealed by the gateway device `Shlyuz-Auto` → sealed copy moved to `incoming/`.
+- `incoming/` — images arriving at the doctor → verified → inbox. Done files go to `<folder>/processed/`, unreadable ones to `failed/`.
+
+`GET /automation` → `{watching, scanner_dir, incoming_dir, interval_s, gateway, sealed, verified, failed, last_event: {at, text} | null, warmup}`
+`POST /automation/run` → process both folders now → `{sealed, verified}`
+
+## Inbox (doctor)
+`POST /inbox` — multipart, field `files` (repeat, max 50) → the new items, most urgent first.
+`GET /inbox` → `{counts: {danger, warning, ok, total}, items: [item]}` — counts are unreviewed only; order: unreviewed, then danger → warning → ok, then newest.
+`GET /inbox/{id}` → item + `result` (the full `/verify` response, or `{error}` for unreadable files) · `POST /inbox/{id}/review` → item with `reviewed: true`.
+```json
+{ "id": 7, "file_name": "patient_A.png", "source": "upload | folder", "received_at": "…",
+  "status": "authentic | tampered | unsigned | forged | error", "severity": "danger | warning | ok",
+  "reasons": ["tampered" | "forged" | "attack_suspected" | "unsigned" | "unreadable" | "device_revoked_later"],
+  "reviewed": false, "device": "Shlyuz-Auto", "changed_tiles": 0, "detective_probability": null, "error": null }
+```
+- danger = tampered / forged / shield attack / unreadable; warning = unsigned (detective gives a probability) or device revoked later; ok = authentic and shield quiet.
+
+## Public QR check (patients, no login)
+`POST /seal` also returns `check_token` (random, not the seal id). Frontend page: `/check/{check_token}`.
+`GET /check/{token}` → `{status: "valid" | "warning" | "invalid", reason, hospital, device, sealed_at, shape}` — no image, no patient data. 404 unknown token.
+`POST /check/{token}` — form `file` → `{status: "authentic" | "tampered" | "forged" | "unsigned" | "mismatch", reason, changed_tiles, preview_png}` (`mismatch` = a different image than the one behind this QR).
+`GET /check/{token}/qr.png?url=<the check page URL>` → QR PNG (url must be http(s) and contain the token).
+
 ## Models
 `GET /models` → `[{id, name, version, source, intended_use}]` — the built-in torchxrayvision DenseNet is created on startup; it is the only model that can be crash-tested.
 

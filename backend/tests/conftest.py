@@ -21,6 +21,9 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "storage_dir", tmp_path / "storage")
     monkeypatch.setattr(settings, "ai_enabled", False)  # AI tests switch it on themselves
     monkeypatch.setattr(settings, "admin_token", ADMIN_TOKEN)
+    monkeypatch.setattr(settings, "watch_enabled", False)  # tests call watcher.run_once() themselves
+    monkeypatch.setattr(settings, "watch_dir", tmp_path / "watch")
+    monkeypatch.setattr(settings, "warmup", False)
     from app.main import app
 
     with TestClient(app) as c:

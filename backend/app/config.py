@@ -40,6 +40,13 @@ class Settings:
     # Detective weights (scripts/train_detective.py) and their held-out quality.
     detective_weights: Path = _path("MEDSEAL_DETECTIVE_WEIGHTS", BACKEND_DIR / "weights" / "detective.pt")
     detective_metrics: Path = BACKEND_DIR / "app" / "ai" / "detective_metrics.json"
+    # Automation (app/automation/watcher.py): watched folders, sealing gateway, model warm-up.
+    watch_enabled: bool = os.environ.get("MEDSEAL_WATCH", "1") != "0"
+    watch_dir: Path = _path("MEDSEAL_WATCH_DIR", BACKEND_DIR.parent / "data" / "watch")
+    watch_interval_s: float = float(os.environ.get("MEDSEAL_WATCH_INTERVAL", "2"))
+    gateway_name: str = os.environ.get("MEDSEAL_GATEWAY_NAME", "Shlyuz-Auto")
+    gateway_hospital: str = os.environ.get("MEDSEAL_GATEWAY_HOSPITAL", "Namangan viloyat shifoxonasi")
+    warmup: bool = os.environ.get("MEDSEAL_WARMUP", "1") != "0"
 
 
 settings = Settings()
