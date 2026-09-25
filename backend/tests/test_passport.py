@@ -7,7 +7,7 @@ from sqlalchemy import inspect
 
 from app import db
 from app.config import settings
-from app.models import CrashTest
+from app.models import CrashTest, Passport
 from app.passport import report
 from tests.conftest import admin_headers
 
@@ -36,17 +36,20 @@ def model_id(client):
     return client.get("/api/models").json()[0]["id"]
 
 
-@pytest.mark.parametrize("score,shield_ok,verdict", [
-    (8.0, False, "allowed"),
-    (7.0, True, "allowed"),
-    (6.9, True, "allowed_with_conditions"),
-    (0.2, True, "allowed_with_conditions"),
-    (0.2, False, "not_allowed"),
+@pytest.mark.parametrize("score,shield_ok,validated,verdict", [
+    (8.0, False, True, "allowed"),
+    (7.0, True, True, "allowed"),
+    (8.0, True, False, "allowed_with_conditions"),
+    (6.9, True, False, "allowed_with_conditions"),
+    (0.2, True, False, "allowed_with_conditions"),
+    (0.2, False, False, "not_allowed"),
 ])
-def test_verdict_rules(score, shield_ok, verdict):
-    got, conditions = report.decide(score, shield_ok)
+def test_verdict_rules(score, shield_ok, validated, verdict):
+    validation = {"dataset": "synthetic validation", "n": 10, "auc": 0.91, "sensitivity": 0.9, "specificity": 0.9} if validated else None
+    got, conditions = report.decide(score, shield_ok, validation)
     assert got == verdict
     assert (report.SHIELD_REQUIRED in conditions) == (verdict == "allowed_with_conditions")
+    assert (report.CLINICAL_VALIDATION_REQUIRED in conditions) == (not validated)
 
 
 def test_passport_requires_admin_token(client, model_id):
@@ -90,9 +93,13 @@ def test_issue_and_read(client, model_id, device):
     assert p["organisation"] == "Namangan viloyat shifoxonasi"
     assert p["robustness"]["crash_test_id"] == ct and p["robustness"]["score"] == 0.2
     assert p["robustness"]["formula"] == report.SCORE_FORMULA
-    assert p["shield"]["compatible"] is True  # committed calibration: PGD caught at eps 1
+    assert p["shield"]["compatible"] is True  # AI-01: point estimate (see test below for the interval-vs-point proof)
+    assert p["shield"]["confidence_intervals"]["detection_pgd_eps1"]["lower"] == 0.880555
+    assert p["shield"]["confidence_intervals"]["false_positive_rate"]["upper"] == 0.022602
+    assert p["shield"]["adaptive_attack_tested"] is False
     assert p["verdict"] == "allowed_with_conditions"
-    assert p["conditions"] == ["shield_required", "seal_required", "doctor_decides"]
+    assert p["conditions"] == ["clinical_validation_required", "shield_required", "seal_required", "doctor_decides"]
+    assert p["clinical_validation"] is None
     assert p["pipeline"] == {"devices_active": 1, "seals": 0, "verifications": 0, "tampered_or_forged": 0,
                              "ledger_ok": True}
     assert p["note"]
@@ -105,13 +112,53 @@ def test_issue_and_read(client, model_id, device):
     assert listed[0]["id"] == p["id"] and listed[0]["robustness_score"] == 0.2
     assert client.get("/api/passport/999").status_code == 404
 
+    assert client.get(f"/api/passport/{p['id']}/verify").json()["valid"] is True
+    with db.SessionLocal() as session:
+        row = session.get(Passport, p["id"])
+        row.report_json = json.dumps({**json.loads(row.report_json), "verdict": "forged"})
+        session.commit()
+    assert client.get(f"/api/passport/{p['id']}/verify").json()["valid"] is False
+
+
+def test_shield_compatible_uses_point_estimates_not_interval_bounds(tmp_path, monkeypatch):
+    """AI-01 (decided): `compatible` reads the point estimates, never the Clopper-Pearson bounds.
+
+    Small trial counts here make the 95% interval miss the 0.9/0.02 thresholds even though the
+    point estimates clear them (9/10 detected = 0.9; 2/100 false alarms = 0.02). If the rule were
+    ever switched to interval bounds, `compatible` below would flip to False.
+    """
+    calibration = {
+        "method": "median 3x3, L1 distance of DenseNet logits",
+        "threshold": 10.0,
+        "dataset": "synthetic test fixture",
+        "n_held_out": 100,
+        "false_positive_count": 2,
+        "false_positive_rate": 0.02,
+        "detection_rate": {
+            "fgsm": {"1": {"attacks_that_fooled_model": 10, "detected_count": 9, "detected": 0.9}},
+            "pgd": {"1": {"attacks_that_fooled_model": 10, "detected_count": 9, "detected": 0.9}},
+        },
+    }
+    path = tmp_path / "shield_calibration.json"
+    path.write_text(json.dumps(calibration))
+    monkeypatch.setattr(settings, "shield_calibration", path)
+
+    block = report.shield_block()
+
+    detection_ci = block["confidence_intervals"]["detection_pgd_eps1"]
+    fpr_ci = block["confidence_intervals"]["false_positive_rate"]
+    assert detection_ci["lower"] < report.SHIELD_MIN_DETECTION, "fixture must make the interval miss the threshold"
+    assert fpr_ci["upper"] > report.SHIELD_MAX_FALSE_ALARMS, "fixture must make the interval miss the threshold"
+    assert block["compatible"] is True, "compatible must follow the 0.9/0.02 point estimates, not the CI bounds"
+    assert block["adaptive_attack_tested"] is False
+
 
 def test_not_allowed_without_shield(client, model_id, tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "shield_calibration", tmp_path / "missing.json")
     add_crash_test(model_id)
     p = client.post("/api/passport", json={"model_id": model_id}, headers=admin_headers()).json()
     assert p["shield"] == {"available": False, "compatible": False}
-    assert p["verdict"] == "not_allowed" and p["conditions"] == ["retest_required"]
+    assert p["verdict"] == "not_allowed" and p["conditions"] == ["clinical_validation_required", "retest_required"]
 
 
 @pytest.mark.parametrize("lang", ["uz", "ru"])

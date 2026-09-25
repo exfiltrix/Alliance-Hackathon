@@ -11,9 +11,10 @@ import json
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.ai.statistics import clopper_pearson
 from app.config import settings
 from app.models import AIModel, CrashTest, Device, Seal, Verification, iso_utc
-from app.seal import ledger
+from app.seal import anchors, ledger
 from app.verify.service import DOCTOR_NOTE
 
 ALLOW_SCORE = 7.0
@@ -41,6 +42,7 @@ SHIELD_REQUIRED = "shield_required"      # every image goes through the shield b
 SEAL_REQUIRED = "seal_required"          # images sealed at capture and verified before the model
 DOCTOR_DECIDES = "doctor_decides"        # model output is advice; the doctor makes the diagnosis
 RETEST_REQUIRED = "retest_required"      # re-run the crash test after retraining (not_allowed)
+CLINICAL_VALIDATION_REQUIRED = "clinical_validation_required"  # research score is not clinical clearance
 
 
 def model_json(m: AIModel) -> dict:
@@ -65,13 +67,29 @@ def robustness_block(ct: CrashTest) -> dict:
     }
 
 
+def _count_and_interval(rate: float, trials: int, count: int | None = None) -> dict:
+    successes = int(count if count is not None else round(rate * trials))
+    lower, upper = clopper_pearson(successes, trials)
+    return {"successes": successes, "n": trials, "lower": round(lower, 6), "upper": round(upper, 6)}
+
+
 def shield_block() -> dict:
     path = settings.shield_calibration
     if not path.exists():
         return {"available": False, "compatible": False}
     c = json.loads(path.read_text())
-    pgd1 = c["detection_rate"]["pgd"]["1"]["detected"]
-    fgsm1 = c["detection_rate"]["fgsm"]["1"]["detected"]
+    pgd_entry = c["detection_rate"]["pgd"]["1"]
+    fgsm_entry = c["detection_rate"]["fgsm"]["1"]
+    pgd1 = pgd_entry["detected"]
+    fgsm1 = fgsm_entry["detected"]
+    n_held_out = int(c["n_held_out"])
+    fpr_count = c.get("false_positive_count")
+    detection_ci = _count_and_interval(
+        pgd1 or 0.0,
+        int(pgd_entry["attacks_that_fooled_model"]),
+        pgd_entry.get("detected_count"),
+    )
+    fpr_ci = _count_and_interval(c["false_positive_rate"], n_held_out, fpr_count)
     return {
         "available": True,
         "method": c["method"],
@@ -79,7 +97,16 @@ def shield_block() -> dict:
         "false_positive_rate": c["false_positive_rate"],
         "detection_pgd_eps1": None if pgd1 is None else round(pgd1, 3),
         "detection_fgsm_eps1": None if fgsm1 is None else round(fgsm1, 3),
+        "confidence_intervals": {
+            "detection_pgd_eps1": detection_ci,
+            "false_positive_rate": fpr_ci,
+        },
+        "adaptive_attack_tested": False,
         "calibrated_on": c["dataset"],
+        # AI-01 (decided): the rule stays on point estimates. With the current calibration sample
+        # (29/29 PGD detections, 4/450 false alarms) the 95% Clopper-Pearson interval does not yet
+        # establish these thresholds on its own (see ARCHITECTURE.md) — the bounds are computed and
+        # shown next to the point estimates instead of gating `compatible`.
         "compatible": (pgd1 or 0) >= SHIELD_MIN_DETECTION and c["false_positive_rate"] <= SHIELD_MAX_FALSE_ALARMS,
     }
 
@@ -87,20 +114,33 @@ def shield_block() -> dict:
 def pipeline_block(session: Session) -> dict:
     """How well the image pipeline in front of the model is protected right now."""
     by_result = dict(session.execute(select(Verification.result, func.count()).group_by(Verification.result)).all())
+    broken = ledger.broken_entries(session)
+    _anchors_checked, anchor_mismatch = anchors.check_anchors(session)
     return {
         "devices_active": session.scalar(select(func.count(Device.id)).where(Device.revoked.is_(False))),
         "seals": session.scalar(select(func.count(Seal.id))),
         "verifications": sum(by_result.values()),
         "tampered_or_forged": by_result.get("tampered", 0) + by_result.get("forged", 0),
-        "ledger_ok": not ledger.broken_entries(session),
+        "ledger_ok": not broken and not anchor_mismatch,
     }
 
 
-def decide(score: float, shield_compatible: bool) -> tuple[str, list[str]]:
-    if score >= ALLOW_SCORE:
+def decide(
+    score: float,
+    shield_compatible: bool,
+    clinical_validation: dict | None = None,
+) -> tuple[str, list[str]]:
+    """Apply research thresholds; clinical validation is required for `allowed`."""
+    validated = clinical_validation is not None
+    if score >= ALLOW_SCORE and validated:
         return "allowed", [SEAL_REQUIRED, DOCTOR_DECIDES]
     if shield_compatible:
-        return "allowed_with_conditions", [SHIELD_REQUIRED, SEAL_REQUIRED, DOCTOR_DECIDES]
+        conditions = [SHIELD_REQUIRED, SEAL_REQUIRED, DOCTOR_DECIDES]
+        if not validated:
+            conditions.insert(0, CLINICAL_VALIDATION_REQUIRED)
+        return "allowed_with_conditions", conditions
+    if not validated:
+        return "not_allowed", [CLINICAL_VALIDATION_REQUIRED, RETEST_REQUIRED]
     return "not_allowed", [RETEST_REQUIRED]
 
 
@@ -108,11 +148,13 @@ def build(session: Session, m: AIModel, ct: CrashTest) -> dict:
     """Everything the passport shows, without id/organisation/created_at (added when it is issued)."""
     robustness = robustness_block(ct)
     shield = shield_block()
-    verdict, conditions = decide(robustness["score"], shield["compatible"])
+    clinical_validation = json.loads(ct.results_json).get("clinical_validation")
+    verdict, conditions = decide(robustness["score"], shield["compatible"], clinical_validation)
     return {
         "model": model_json(m),
         "robustness": robustness,
         "shield": shield,
+        "clinical_validation": clinical_validation,
         "pipeline": pipeline_block(session),
         "verdict": verdict,
         "conditions": conditions,
@@ -120,6 +162,7 @@ def build(session: Session, m: AIModel, ct: CrashTest) -> dict:
             "allow_score": ALLOW_SCORE,
             "shield_min_detection": SHIELD_MIN_DETECTION,
             "shield_max_false_alarms": SHIELD_MAX_FALSE_ALARMS,
+            "clinical_validation_required": True,
         },
         "protocol": PROTOCOL,
         "note": DOCTOR_NOTE,
