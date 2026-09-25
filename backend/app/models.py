@@ -25,7 +25,9 @@ class Device(Base):
     name: Mapped[str] = mapped_column(String(200))
     hospital: Mapped[str] = mapped_column(String(300), default="")
     public_key_hex: Mapped[str] = mapped_column(String(64))
+    token_hash: Mapped[str] = mapped_column(String(64), default="")  # sha256 of the bearer token; see app.auth
     revoked: Mapped[bool] = mapped_column(Boolean, default=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
@@ -43,6 +45,8 @@ class Seal(Base):
     tile: Mapped[int] = mapped_column(Integer)
     leaves_json: Mapped[str] = mapped_column(Text)  # JSON [[y, x, sha256_hex], ...] sorted by (y, x)
     root_hex: Mapped[str] = mapped_column(String(64))
+    meta_hash_hex: Mapped[str] = mapped_column(String(64), default="")  # sha256 of imaging.meta_fields; see P0-5
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")  # the fields themselves, for changed_meta on verify
     sig_hex: Mapped[str] = mapped_column(String(128))
     prev_hash: Mapped[str] = mapped_column(String(64), unique=True)  # unique => the chain cannot fork
     entry_hash: Mapped[str] = mapped_column(String(64), unique=True)

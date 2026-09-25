@@ -69,7 +69,9 @@ def test_issue_and_read(client, model_id, device):
     assert p["note"]
 
     # frozen: later activity does not rewrite an issued passport
-    client.post("/api/devices", json={"name": "KT-02"})
+    from tests.conftest import admin_headers
+
+    assert client.post("/api/devices", json={"name": "KT-02"}, headers=admin_headers()).status_code == 201
     assert client.get(f"/api/passport/{p['id']}").json() == p
 
     listed = client.get("/api/passports").json()

@@ -9,11 +9,11 @@ from sqlalchemy import update
 
 from app import db
 from app.models import Seal
-from tests.conftest import png_pixels, replace_png_pixels, xray_png
+from tests.conftest import admin_headers, png_pixels, replace_png_pixels, xray_png
 
 
 def seal(client, device, data: bytes, name="img.png"):
-    r = client.post("/api/seal", files={"file": (name, data)}, data={"device_id": device["id"]})
+    r = client.post("/api/seal", files={"file": (name, data)}, headers=device["auth"])
     assert r.status_code == 200, r.text
     body = r.json()
     return body, client.get(body["download_url"]).content
@@ -25,12 +25,29 @@ def verify(client, data: bytes, name="img.png"):
     return r.json()
 
 
-def test_device_never_exposes_private_key(client, device, tmp_path):
-    assert set(device) == {"id", "name", "hospital", "public_key_hex", "revoked", "created_at"}
+def test_seal_requires_a_device_token(client, device):
+    """P0-1: sealing must not be possible with a bare device_id and no credentials."""
+    r = client.post("/api/seal", files={"file": ("x.png", xray_png(seed=42))})
+    assert r.status_code == 401
+
+
+def test_create_device_requires_admin_token(client):
+    """P0-1: anyone reaching the API must not be able to mint a trusted device."""
+    assert client.post("/api/devices", json={"name": "attacker-forged-device"}).status_code == 401
+    assert client.post(
+        "/api/devices", json={"name": "attacker-forged-device"}, headers={"Authorization": "Bearer wrong"}
+    ).status_code == 401
+
+
+def test_device_never_exposes_private_key_or_token(client, device, tmp_path):
+    assert set(device) - {"auth"} == {"id", "name", "hospital", "public_key_hex", "revoked", "created_at", "token"}
     assert len(device["public_key_hex"]) == 64
+    assert len(device["token"]) > 20  # returned once, at creation, only
     pem = (tmp_path / "keys" / f"device_{device['id']}.pem").read_bytes()
     listed = client.get("/api/devices").text
-    assert b"PRIVATE KEY" in pem and "PRIVATE" not in listed
+    assert b"PRIVATE KEY" in pem
+    assert "PRIVATE" not in listed
+    assert device["token"] not in listed
 
 
 def test_png_round_trip(client, device):
@@ -112,6 +129,22 @@ def test_dicom_seal_strips_patient_tags(client, device, ct_path):
     assert result["status"] == "tampered" and result["changed_tiles"] == [[32, 16]]
 
 
+def test_dicom_rescale_intercept_change_is_detected(client, device, ct_path):
+    """P0-5: RescaleIntercept shifts every displayed HU value without touching a single pixel."""
+    raw = open(ct_path, "rb").read()
+    _, sealed = seal(client, device, raw, "ct.dcm")
+
+    ds = pydicom.dcmread(io.BytesIO(sealed))
+    ds.RescaleIntercept = float(getattr(ds, "RescaleIntercept", 0)) + 1000
+    buf = io.BytesIO()
+    ds.save_as(buf, enforce_file_format=True)
+
+    result = verify(client, buf.getvalue(), "ct.dcm")
+    assert result["status"] == "tampered"
+    assert result["reason"] == "metadata_changed"
+    assert "RescaleIntercept" in result["changed_meta"]
+
+
 def test_reseal_same_image_is_idempotent(client, device):
     first, sealed = seal(client, device, xray_png())
     again, _ = seal(client, device, sealed)
@@ -119,17 +152,61 @@ def test_reseal_same_image_is_idempotent(client, device):
 
     px = png_pixels(sealed)
     px[0, 0] ^= 1
-    r = client.post("/api/seal", files={"file": ("x.png", replace_png_pixels(sealed, px))}, data={"device_id": device["id"]})
+    r = client.post("/api/seal", files={"file": ("x.png", replace_png_pixels(sealed, px))}, headers=device["auth"])
     assert r.status_code == 409
 
 
 def test_revoked_device(client, device):
+    """P0-2: revocation is not retroactive. A seal made before revoked_at stays trusted
+    (with a warning); a NEW seal from the same (now revoked) token/device is refused outright."""
     _, sealed = seal(client, device, xray_png())
-    client.post(f"/api/devices/{device['id']}/revoke")
+    client.post(f"/api/devices/{device['id']}/revoke", headers=admin_headers())
+
+    result = verify(client, sealed)
+    assert result["status"] == "authentic"
+    assert result["warning"] == "device_revoked_later"
+
+    r = client.post("/api/seal", files={"file": ("x.png", xray_png(seed=5))}, headers=device["auth"])
+    assert r.status_code == 403  # require_device rejects a revoked device's token before sealing
+
+
+def test_seal_made_after_revocation_is_forged(client, device):
+    """A row whose created_at is at/after revoked_at (e.g. the key was stolen and used, then the
+    theft was noticed and reported) must still be forged, unlike the case above."""
+    _, sealed = seal(client, device, xray_png())
+    from datetime import timedelta
+
+    from app import db
+    from app.models import Device, Seal, utcnow
+
+    with db.SessionLocal() as s:
+        # Backdate the revocation to before the seal was made, simulating a key compromised earlier.
+        s.get(Device, device["id"]).revoked_at = s.get(Seal, 1).created_at - timedelta(minutes=1)
+        s.get(Device, device["id"]).revoked = True
+        s.commit()
+
     result = verify(client, sealed)
     assert result["status"] == "forged" and result["reason"] == "device_revoked"
-    r = client.post("/api/seal", files={"file": ("x.png", xray_png(seed=5))}, data={"device_id": device["id"]})
-    assert r.status_code == 409
+
+
+def test_png_alpha_only_edit_is_detected(client, device):
+    """P0-3: alpha carries no luminance, so this edit is luminance-invariant — catching it proves
+    the seal hashes every channel, not just grayscale luminance."""
+    rng = np.random.default_rng(7)
+    rgba = np.zeros((256, 256, 4), np.uint8)
+    rgba[..., :3] = rng.integers(0, 256, (256, 256, 3), dtype=np.uint8)
+    rgba[..., 3] = 255
+    buf = io.BytesIO()
+    Image.fromarray(rgba, "RGBA").save(buf, "PNG")
+
+    _, sealed_bytes = seal(client, device, buf.getvalue())
+    px = np.array(Image.open(io.BytesIO(sealed_bytes)))
+    edited = px.copy()
+    edited[64:128, 64:128, 3] = 0  # a region becomes fully transparent; R/G/B untouched
+    fake = replace_png_pixels(sealed_bytes, edited)
+
+    result = verify(client, fake)
+    assert result["status"] == "tampered"
 
 
 def test_rejects_unknown_format(client, device):

@@ -61,7 +61,7 @@ class TestTrained:
         png = (SAMPLES / HEALTHY[0]).read_bytes()
         r = client.post("/api/verify", files={"file": ("x.png", png)}).json()
         assert r["status"] == "unsigned" and 0 <= r["detective"]["probability"] <= 1
-        seal = client.post("/api/seal", files={"file": ("x.png", png)}, data={"device_id": device["id"]}).json()
+        seal = client.post("/api/seal", files={"file": ("x.png", png)}, headers=device["auth"]).json()
         sealed = client.get(seal["download_url"]).content
         r = client.post("/api/verify", files={"file": ("x.png", sealed)}).json()
         assert r["status"] == "authentic" and "detective" not in r

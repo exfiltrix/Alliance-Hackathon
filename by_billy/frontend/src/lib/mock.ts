@@ -1,13 +1,8 @@
 // Demo data used when NEXT_PUBLIC_API_URL is not set. Mirrors the real API shapes.
 import type { Api } from "./api";
-import type { AiModel, CrashTestJob, Device, Passport, VerifyResponse } from "./types";
+import type { AiModel, CrashTestJob, Passport, VerifyResponse } from "./types";
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-const devices: Device[] = [
-  { id: 1, name: "KT-01", hospital: "Namangan viloyat shifoxonasi" },
-  { id: 2, name: "RG-02", hospital: "Toshkent shahar klinikasi" },
-];
 
 const models: AiModel[] = [
   {
@@ -133,25 +128,14 @@ function heatmap(): string {
 }
 
 export const mockApi: Api = {
-  async getDevices() {
-    await wait(200);
-    return [...devices];
-  },
-  async createDevice(name, hospital) {
-    await wait(300);
-    const d = { id: devices.length + 1, name, hospital };
-    devices.push(d);
-    return d;
-  },
-
-  async seal(file, deviceId) {
+  async seal(file) {
     await wait(600);
     sealedNames.add(file.name);
     const id = nextId++;
     return {
       seal_id: id,
       uid: `1.3.6.1.4.1.${Date.now()}`,
-      device_id: deviceId,
+      device_id: 1,
       tiles: 256,
       root: Array.from({ length: 64 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join(""),
       created_at: new Date().toISOString(),

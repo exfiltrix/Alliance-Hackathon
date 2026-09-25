@@ -20,6 +20,9 @@ export type SealResponse = {
 export type VerifyStatus = "authentic" | "tampered" | "unsigned" | "forged";
 
 export type ForgedReason = "ledger_entry_modified" | "bad_signature" | "device_revoked" | "unknown_device";
+// P0-5: appears on `tampered` too, when display metadata (RescaleIntercept, Laterality...)
+// was edited without touching pixels.
+export type TamperedReason = ForgedReason | "metadata_changed";
 
 export type VerifyResponse = {
   status: VerifyStatus;
@@ -28,7 +31,10 @@ export type VerifyResponse = {
   seal_id?: number | null;
   changed_tiles: [number, number][];
   tile?: number | null;
-  reason?: ForgedReason;
+  reason?: TamperedReason;
+  changed_meta?: string[]; // tag names, only with reason === "metadata_changed"
+  // Non-fatal: the device was revoked AFTER this seal was made, so it is still trusted.
+  warning?: "device_revoked_later";
   verify_ms?: number;
   preview_png: string;
   // null when the AI is off on the backend; the detective key only exists for unsigned images
