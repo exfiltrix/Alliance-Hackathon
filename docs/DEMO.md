@@ -17,10 +17,9 @@ Open `/crash-test` → before/after: healthy X-ray, AI says ~8% pneumonia → af
 Show the shield on `/verify`: "Yashirin hujum aniqlandi".
 
 ## 3b. Even we can't cheat (30 s)
-Before the demo (local chain, no internet needed):
-- terminal 1: `cd contracts && npx hardhat node` — keep it open until the demo is over (the chain lives in its memory);
-- terminal 2: `cd contracts && npm run deploy:local` (the address matches `backend/.env`), then start the backend;
-- seal the original (step 1), then anchor it: `curl -X POST -H "Authorization: Bearer <MEDSEAL_ADMIN_TOKEN>" http://localhost:8000/api/anchors/run`.
+Before the demo (local chain, no internet needed): run `./demo.sh` in the repo root instead of the usual backend command —
+it starts the local blockchain, deploys the contract and the backend, and anchors new seals every 15 s by itself.
+Seal the original (step 1) at least 15 s before this step.
 
 On stage: play the insider who has our database AND the device keys:
 `cd backend && .venv/bin/python -m scripts.rewrite_history_demo <seal_id> --image <fake>.png` — it re-signs the fake into the ledger and repairs the hash chain ("local ledger check: clean").
@@ -29,7 +28,7 @@ Say: "Nobody can rewrite the history of seals — not a hacker, not a hospital, 
 
 Pitfalls:
 - The script really rewrites that seal — use a fresh seal for every rehearsal.
-- If the hardhat node was restarted, everything anchored before is gone (older seals show "unavailable"): redeploy, seal a new image, anchor again.
+- Keep `./demo.sh` running until the demo is over: the local chain lives in its memory. After a restart the backend re-anchors old seals by itself within 15 s.
 
 ## 4. Passport (20 s)
 Open the model's passport: robustness score, verdict, PDF.

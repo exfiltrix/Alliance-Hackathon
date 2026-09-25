@@ -20,6 +20,9 @@ async def lifespan(app: FastAPI):
         warmup.start()
     if settings.watch_enabled:
         watcher.start()
+    if anchor_chain.configured():
+        with db.SessionLocal() as session:
+            anchoring.resync_local_chain(session)  # local Hardhat node restarted since last run
     if settings.anchor_enabled and anchor_chain.configured():
         anchoring.start()
     yield

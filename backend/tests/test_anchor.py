@@ -4,6 +4,7 @@ import pytest
 from sqlalchemy import delete, update
 
 from app import db
+from app.anchor import service as anchoring
 from app.imaging import load_image
 from app.models import Anchor, Seal, SealAnchor
 from app.seal import ledger, merkle
@@ -172,3 +173,26 @@ def test_broken_row_is_not_anchored(client, device, chain):
         session.commit()
     assert anchor_now(client)["anchored"] == 0
     assert chain.anchors == []
+
+
+def test_local_chain_restart_is_healed(client, device, chain):
+    """Hardhat node restarted: its contract is empty again. Old proofs are dropped and re-anchored."""
+    _, sealed = seal(client, device, xray_png(seed=14))
+    anchor_now(client)
+    chain.anchors.clear()  # node restart
+    assert verify(client, sealed)["blockchain"]["status"] == "unavailable"
+    with db.SessionLocal() as session:
+        assert anchoring.resync_local_chain(session) == 1
+    assert verify(client, sealed)["blockchain"] == {"status": "pending"}
+    assert anchor_now(client)["anchored"] == 1
+    assert verify(client, sealed)["blockchain"]["status"] == "anchored"
+
+
+def test_real_chain_is_never_resynced(client, device, chain):
+    chain.chain_id = 11155111  # Sepolia
+    _, sealed = seal(client, device, xray_png(seed=15))
+    anchor_now(client)
+    chain.anchors.clear()
+    with db.SessionLocal() as session:
+        assert anchoring.resync_local_chain(session) == 0
+    assert verify(client, sealed)["blockchain"]["status"] == "unavailable"

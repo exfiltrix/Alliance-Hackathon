@@ -12,7 +12,7 @@ import logging
 import threading
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app import audit, db
@@ -57,6 +57,34 @@ def run_batch(session: Session, actor: str = "scheduler", ip: str | None = None)
         session.commit()
         log.info("anchored %d seals in block %d (tx %s)", len(rows), tx.block_number, tx.tx_hash)
         return anchor
+
+
+LOCAL_DEV_CHAIN_IDS = {31337}  # Hardhat node: lives in memory, forgets everything when restarted
+
+
+def resync_local_chain(session: Session) -> int:
+    """After a restart of the local Hardhat node its contract is empty, but our tables still point
+    at the old batches — every older seal would read "unavailable" forever. Forget those batches so
+    the next run re-anchors the seals. Never on a real network: a real chain cannot be reset, and
+    there the same symptom means something is badly wrong. -> number of batches forgotten."""
+    chain = get_chain()
+    if chain is None:
+        return 0
+    try:
+        chain_id, total = chain.chain_id, chain.total()
+    except ChainError:
+        return 0
+    if chain_id not in LOCAL_DEV_CHAIN_IDS:
+        return 0
+    stale = list(session.scalars(select(Anchor).where(Anchor.chain_id == chain_id, Anchor.onchain_index >= total)))
+    if not stale:
+        return 0
+    ids = [a.id for a in stale]
+    session.execute(delete(SealAnchor).where(SealAnchor.anchor_id.in_(ids)))
+    session.execute(delete(Anchor).where(Anchor.id.in_(ids)))
+    session.commit()
+    log.warning("local chain was reset: forgot %d old batches, their seals will be re-anchored", len(ids))
+    return len(ids)
 
 
 def _iso(ts: int) -> str:

@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Тепловая карта детектива во фронтенде не показывается: она построена по центральному квадрату 224×224 и на тестах попадает на подделку лишь в 4,8% случаев.
 - Автоматизация (`app/automation/`): наблюдатель папок `data/watch/scanner` (автопечать шлюзом `Shlyuz-Auto` → копия в `incoming`) и `data/watch/incoming` (автопроверка → «Входящие» врача, сортировка danger/warning/ok), прогрев ИИ при старте, публичная QR-проверка `/check/{token}` (токен в таблице `public_checks`, не в реестре). В тестах наблюдатель и прогрев выключены (conftest), тесты зовут `watcher.run_once()`.
 - Печать через сайт идёт через серверный роут Next.js с `MEDSEAL_DEVICE_TOKEN` в `.env.local` (создать: `python -m scripts.create_demo_device`).
-- **Блокчейн-якорение** (`docs/BLOCKCHAIN.md` §7 — чем реализация отличается от плана): контракт в `contracts/` (Hardhat 2), бэкенд в `app/anchor/` (`chain.py` — web3-клиент и `MemoryChain` для тестов, `service.py` — батчи и проверка), дерево с доменами в `app/seal/merkle.py`. Выключено, пока в `backend/.env` нет `RPC_URL`/`CONTRACT_ADDRESS`/`ANCHOR_PRIVATE_KEY` — тогда `blockchain: null` в `/verify`. Расхождение с цепочкой → `forged`/`blockchain_mismatch`. Тесты никогда не ходят в настоящую сеть (conftest), фикстура `chain` подставляет `MemoryChain`. `config.py` читает `backend/.env` через python-dotenv.
+- **Блокчейн-якорение** (`docs/BLOCKCHAIN.md` §7 — чем реализация отличается от плана): контракт в `contracts/` (Hardhat 2), бэкенд в `app/anchor/` (`chain.py` — web3-клиент и `MemoryChain` для тестов, `service.py` — батчи и проверка), дерево с доменами в `app/seal/merkle.py`. Выключено, пока в `backend/.env` нет `RPC_URL`/`CONTRACT_ADDRESS`/`ANCHOR_PRIVATE_KEY` — тогда `blockchain: null` в `/verify`. Расхождение с цепочкой → `forged`/`blockchain_mismatch`. Тесты никогда не ходят в настоящую сеть (conftest), фикстура `chain` подставляет `MemoryChain`. `config.py` читает `backend/.env` через python-dotenv. При старте `resync_local_chain` забывает батчи, которых нет в перезапущенном Hardhat-узле (только chain id 31337), и печати якорятся заново.
 - **Безопасность (`docs/SECURITY.md`, раздел «As implemented»):** журнал аудита `audit_log` (`app/audit.py`, `GET /api/audit` для админа, только добавление), заголовки и лимит POST 120/мин на IP (`app/security.py`, в тестах лимит выключен), лимит 64 Мпикс до декодирования (`imaging.ImageTooLarge` → 413). Индекс «угроза → тест» — `tests/test_threats.py::THREAT_TESTS`, новый ✅ в SECURITY.md без теста роняет `test_every_threat_has_a_test`.
 - Все документы — в `docs/` (`SPEC.md`, `ARCHITECTURE.md`, `API.md`, `TASKS.md`, `DEMO.md`, `BLOCKCHAIN.md`, `SECURITY.md`); в корне их копий нет.
 - `reference/medseal_poc.py` извлечён из `muhr.zip`; остальное содержимое архива дублирует файлы в корне.
@@ -98,6 +98,12 @@ cd by_billy/frontend && npm install && cp .env.example .env.local && npm run dev
 npm run build && npm run lint                       # проверка типов и линтер
 # доступ с других устройств в Wi-Fi: backend с --host 0.0.0.0, .env.local остаётся localhost:8000 —
 # api.ts сам подставляет хост, с которого открыт сайт; CORS пускает любые частные IP:3000; после смены сети перезапустить npm run dev
+
+# ДЕМО одной командой (вместо uvicorn): локальный блокчейн + контракт + backend, якорение каждые 15 с
+./demo.sh                                                 # Ctrl+C гасит всё; порт: MEDSEAL_PORT
+
+# автопроверка перед коммитом (один раз на клон): секреты + тесты изменённых частей; CI — .github/workflows/ci.yml
+git config core.hooksPath .githooks
 
 # блокчейн (contracts/, Node): локальная цепочка для офлайн-демо
 cd contracts && npm install && npx hardhat test

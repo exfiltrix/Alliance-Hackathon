@@ -26,3 +26,6 @@ contracts/artifacts/
 contracts/cache/
 contracts/typechain-types/
 contracts/coverage/
+
+# local chain log from demo.sh
+contracts/node.log
