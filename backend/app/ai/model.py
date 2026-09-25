@@ -40,13 +40,29 @@ def pathology_index(name: str = DEMO_PATHOLOGY) -> int:
 
 
 def to_unit255(px: np.ndarray) -> np.ndarray:
-    """Grayscale pixels -> float32 in 0..255. 8-bit is kept as is, other depths are windowed 1..99 percentile."""
-    if px.dtype == np.uint8:
+    """Grayscale pixels -> float32 in 0..255. Data already in that range is kept as is
+    (just cast); anything wider (e.g. CT Hounsfield units) is windowed 1..99 percentile."""
+    # IMG-01 routes every AI input through display_pixels(), which always returns float32
+    # -- including for ordinary 8-bit PNGs, whose values are still exactly 0..255, just no
+    # longer stored as uint8. The old `px.dtype == np.uint8` check was a proxy for "already
+    # display-ready"; since IMG-01 that proxy is never true for AI inputs, so this function
+    # silently applied a percentile contrast-stretch to every image, including PNGs that
+    # never needed one -- e.g. a sample chest X-ray's Pneumonia score moved from 0.16 to
+    # 0.50 (just over the 0.5 "healthy" threshold) purely from this spurious rescale, with
+    # no change to the actual pixels. Checking the value range instead of the dtype is
+    # correct for both cases: an unchanged 8-bit-range image (any dtype) is left alone, and
+    # genuinely wider-range data (DICOM HU units, 16-bit) still gets windowed as before.
+    if px.dtype == np.uint8 or (px.min() >= 0 and px.max() <= 255):
         return px.astype(np.float32)
     lo, hi = np.percentile(px, [1, 99])
     if hi <= lo:
         hi = lo + 1
-    return np.clip((px.astype(np.float32) - lo) * 255.0 / (hi - lo), 0, 255)
+    # np.percentile returns float64 scalars; under NumPy 2's NEP 50 promotion rules,
+    # `float32_array - float64_scalar` silently upcasts to float64 (this used to stay
+    # float32 under the old casting rules), and the model's weights are float32 -- an
+    # un-forced float64 tensor fails at the first conv layer ("expected scalar type
+    # Double but found Float"), so the result is cast back explicitly.
+    return np.clip((px.astype(np.float32) - lo) * 255.0 / (hi - lo), 0, 255).astype(np.float32)
 
 
 def preprocess(px: np.ndarray) -> torch.Tensor:
