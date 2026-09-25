@@ -19,6 +19,7 @@ const dictionary = {
     dashboard: { uz: "Statistika", ru: "Статистика", en: "Statistics" },
     cta: { uz: "Boshlash", ru: "Начать", en: "Get started" },
     register: { uz: "Ro'yxatdan o'tish", ru: "Регистрация", en: "Sign up" },
+    login: { uz: "Kirish", ru: "Войти", en: "Log in" },
     logout: { uz: "Chiqish", ru: "Выйти", en: "Log out" },
     menu: { uz: "Asosiy menyu", ru: "Главное меню", en: "Main menu" },
     language: { uz: "Til", ru: "Язык", en: "Language" },
@@ -321,6 +322,24 @@ const dictionary = {
       },
       passwordMismatch: { uz: "Parollar mos kelmadi", ru: "Пароли не совпадают", en: "Passwords don't match" },
     },
+    haveAccount: { uz: "Hisobingiz bormi?", ru: "Уже есть аккаунт?", en: "Already have an account?" },
+  },
+  login: {
+    title: { uz: "Kirish", ru: "Вход", en: "Log in" },
+    subtitle: {
+      uz: "Hisob turingizni tanlang va ma'lumotlaringizni kiriting.",
+      ru: "Выберите тип аккаунта и введите свои данные.",
+      en: "Choose your account type and enter your details.",
+    },
+    nameLabel: { uz: "F.I.Sh. yoki tashkilot nomi", ru: "ФИО или название организации", en: "Full name or organisation" },
+    submit: { uz: "Kirish", ru: "Войти", en: "Log in" },
+    submitting: { uz: "Kirilmoqda…", ru: "Входим…", en: "Logging in…" },
+    demoNote: {
+      uz: "Demo rejim: parol tekshirilmaydi, chunki hali foydalanuvchilar bazasi yo'q. Kiritgan ismingiz shifokor/tashkilot sifatida ko'rsatiladi.",
+      ru: "Демо-режим: пароль не проверяется — базы пользователей пока нет. Введённое имя будет показано как врач/организация.",
+      en: "Demo mode: the password isn't checked — there's no user database yet. The name you enter is shown as the doctor/organisation.",
+    },
+    noAccount: { uz: "Hisobingiz yo'qmi?", ru: "Нет аккаунта?", en: "No account?" },
   },
   gate: {
     title: { uz: "Avval ro'yxatdan o'ting", ru: "Сначала зарегистрируйтесь", en: "Register first" },
