@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 import { A11Y_KEY } from "./a11y-init";
+import type { Lang } from "./dictionary";
 
 export type A11ySettings = {
   font: 0 | 1 | 2;
@@ -11,6 +12,9 @@ export type A11ySettings = {
   links: boolean;
   reduceMotion: boolean;
   speech: boolean;
+  speechRate: number;
+  // Chosen voiceURI per UI language; missing = pick the best available automatically.
+  speechVoices: Partial<Record<Lang, string>>;
 };
 
 export const DEFAULT_A11Y: A11ySettings = {
@@ -21,6 +25,8 @@ export const DEFAULT_A11Y: A11ySettings = {
   links: false,
   reduceMotion: false,
   speech: false,
+  speechRate: 0.95,
+  speechVoices: {},
 };
 
 function applyA11y(s: A11ySettings) {

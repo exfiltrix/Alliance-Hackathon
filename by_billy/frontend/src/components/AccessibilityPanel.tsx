@@ -4,12 +4,18 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
 import { updateA11y, useA11y, type A11ySettings } from "@/lib/a11y";
-import { speak, speechSupported, stopSpeech } from "@/lib/speech";
+import { getVoicesSnapshot, speak, speechSupported, stopSpeech, subscribeVoices, voicePlan } from "@/lib/speech";
 import { AccessibilityIcon, SpeakerIcon } from "./icons";
 
 const d = dictionary.a11y;
 
 const noop = () => () => {};
+const NO_VOICES: SpeechSynthesisVoice[] = [];
+const SPEEDS = [
+  { key: "slow", rate: 0.8 },
+  { key: "normal", rate: 0.95 },
+  { key: "fast", rate: 1.15 },
+] as const;
 
 function Toggle({
   label,
@@ -41,7 +47,7 @@ function Toggle({
   );
 }
 
-function useSpeechReader(enabled: boolean) {
+function useSpeechReader(enabled: boolean, rate: number, voiceURI: string | undefined) {
   const { lang } = useLanguage();
 
   useEffect(() => {
@@ -60,7 +66,7 @@ function useSpeechReader(enabled: boolean) {
         }
         if (text === lastSpoken) return;
         lastSpoken = text;
-        speak(text, lang);
+        speak(text, lang, { rate, voiceURI });
       }, 500);
     };
 
@@ -70,11 +76,11 @@ function useSpeechReader(enabled: boolean) {
       document.removeEventListener("selectionchange", onSelectionChange);
       stopSpeech();
     };
-  }, [enabled, lang]);
+  }, [enabled, lang, rate, voiceURI]);
 }
 
 export default function AccessibilityPanel() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const settings = useA11y();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -82,7 +88,11 @@ export default function AccessibilityPanel() {
   const titleId = useId();
   const canSpeak = useSyncExternalStore(noop, speechSupported, () => false);
 
-  useSpeechReader(settings.speech);
+  const voices = useSyncExternalStore(subscribeVoices, getVoicesSnapshot, () => NO_VOICES);
+  const plan = voicePlan(lang, voices);
+  const voiceURI = settings.speechVoices[lang];
+
+  useSpeechReader(settings.speech, settings.speechRate, voiceURI);
 
   useEffect(() => {
     if (!open) return;
@@ -222,15 +232,70 @@ export default function AccessibilityPanel() {
                 />
                 <p className="px-3 text-xs text-muted">{t(d.speechHint)}</p>
                 {settings.speech && (
-                  <div className="mt-3 px-1">
-                    <button
-                      type="button"
-                      onClick={stopSpeech}
-                      className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2 text-sm font-medium hover:bg-slate-100"
-                    >
-                      <SpeakerIcon width={16} height={16} />
-                      {t(d.stop)}
-                    </button>
+                  <div className="mt-3 space-y-3 px-1">
+                    <fieldset>
+                      <legend className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted">{t(d.speed)}</legend>
+                      <div className="flex gap-2">
+                        {SPEEDS.map(({ key, rate }) => (
+                          <button
+                            key={key}
+                            type="button"
+                            aria-pressed={settings.speechRate === rate}
+                            onClick={() => set({ speechRate: rate })}
+                            className={optionClass(settings.speechRate === rate)}
+                          >
+                            {t(d.speeds[key])}
+                          </button>
+                        ))}
+                      </div>
+                    </fieldset>
+
+                    {plan.voices.length > 0 ? (
+                      <div>
+                        <label htmlFor="a11y-voice" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-muted">
+                          {t(d.voice)}
+                        </label>
+                        <select
+                          id="a11y-voice"
+                          value={voiceURI && plan.voices.some((v) => v.voiceURI === voiceURI) ? voiceURI : ""}
+                          onChange={(e) =>
+                            set({ speechVoices: { ...settings.speechVoices, [lang]: e.target.value || undefined } })
+                          }
+                          className="w-full rounded-xl border border-border bg-white px-3 py-2 text-sm outline-none focus:border-accent"
+                        >
+                          <option value="">
+                            {t(d.voiceAuto)} — {plan.voices[0].name}
+                          </option>
+                          {plan.voices.map((v) => (
+                            <option key={v.voiceURI} value={v.voiceURI}>
+                              {v.name} ({v.lang})
+                            </option>
+                          ))}
+                        </select>
+                        {plan.mode === "translit" && <p className="mt-1.5 text-xs text-muted">{t(d.translitNote)}</p>}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted">{t(d.noVoice)}</p>
+                    )}
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => speak(t(d.testPhrase), lang, { rate: settings.speechRate, voiceURI })}
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-foreground px-3 py-2 text-sm font-medium text-white hover:bg-foreground/90"
+                      >
+                        <SpeakerIcon width={16} height={16} />
+                        {t(d.test)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={stopSpeech}
+                        className="rounded-xl border border-border px-3 py-2 text-sm font-medium hover:bg-slate-100"
+                      >
+                        {t(d.stop)}
+                      </button>
+                    </div>
+                    <p className="text-[11px] leading-snug text-muted">{t(d.betterVoices)}</p>
                   </div>
                 )}
               </>
