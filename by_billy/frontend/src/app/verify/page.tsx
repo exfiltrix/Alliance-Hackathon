@@ -12,11 +12,13 @@ import { VerifyIcon } from "@/components/icons";
 
 const d = dictionary.verify;
 
+// P1-02: unsigned is a warning, not a neutral "nothing to see here" grey — stripping the seal
+// ID from a tampered image also yields "unsigned", so it must read as a caution, not a pass.
 const statusStyle: Record<VerifyStatus, string> = {
   authentic: "border-ok/30 bg-ok/10 text-ok",
   tampered: "border-danger/30 bg-danger/10 text-danger",
   forged: "border-danger/30 bg-danger/10 text-danger",
-  unsigned: "border-border bg-slate-100 text-slate-600",
+  unsigned: "border-amber-300 bg-amber-50 text-amber-900",
 };
 
 export default function VerifyPage() {

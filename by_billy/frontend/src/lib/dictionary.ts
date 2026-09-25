@@ -402,9 +402,9 @@ const dictionary = {
       authentic: {
         title: { uz: "Tasdiqlangan", ru: "Подтверждён", en: "Authentic" },
         desc: {
-          uz: "Imzo haqiqiy, barcha bo'laklar mos keladi. Surat olingandan beri o'zgartirilmagan.",
-          ru: "Подпись верна, все фрагменты совпадают. Снимок не менялся с момента съёмки.",
-          en: "The signature is valid and every tile matches. The image has not changed since capture.",
+          uz: "Imzo haqiqiy, barcha bo'laklar mos keladi. Surat muhrlangandan beri o'zgartirilmagan.",
+          ru: "Подпись верна, все фрагменты совпадают. Снимок не менялся с момента печати.",
+          en: "The signature is valid and every tile matches. The image has not changed since it was sealed.",
         },
       },
       tampered: {
@@ -416,11 +416,11 @@ const dictionary = {
         },
       },
       unsigned: {
-        title: { uz: "Muhrlanmagan", ru: "Без печати", en: "Unsigned" },
+        title: { uz: "Tasdiqlanmagan", ru: "Не подтверждён", en: "Unconfirmed" },
         desc: {
-          uz: "Bu surat uchun muhr topilmadi. AI detektiv soxtalik ehtimolini baholadi.",
-          ru: "Печать для этого снимка не найдена. AI-детектив оценил вероятность подделки.",
-          en: "No seal was found for this image. The AI detective estimated the probability of tampering.",
+          uz: "Bu surat uchun muhr topilmadi — uning kelib chiqishini isbotlab bo'lmaydi. Himoyalangan tizimda bunday surat tashxis uchun ishlatilmasligi kerak. Pastdagi ko'rsatkich — bu faqat ehtimollik.",
+          ru: "Печать для этого снимка не найдена — подтвердить его происхождение нельзя. В защищённом контуре такой снимок не должен использоваться для диагноза. Показатель ниже — только вероятность.",
+          en: "No seal was found for this image — its origin cannot be confirmed. Inside a protected pipeline, an image like this must not be used for diagnosis. The score below is only a probability.",
         },
       },
       forged: {
