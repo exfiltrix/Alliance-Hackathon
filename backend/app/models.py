@@ -1,4 +1,4 @@
-"""SQLite tables, as listed in ARCHITECTURE.md §3."""
+"""SQLite tables, as listed in docs/ARCHITECTURE.md §3."""
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
@@ -127,3 +127,48 @@ class InboxItem(Base):
     result_json: Mapped[str] = mapped_column(Text, default="{}")  # full /verify response, incl. preview
     reviewed: Mapped[bool] = mapped_column(Boolean, default=False)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Anchor(Base):
+    """One batch of ledger entries whose Merkle root was written to the MedSealAnchor contract
+    (docs/BLOCKCHAIN.md). Only confirmed batches are stored; a failed send leaves no row."""
+
+    __tablename__ = "anchors"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    batch_root_hex: Mapped[str] = mapped_column(String(64), unique=True)
+    count: Mapped[int] = mapped_column(Integer)
+    tx_hash: Mapped[str] = mapped_column(String(66))
+    block_number: Mapped[int] = mapped_column(Integer)
+    chain_id: Mapped[int] = mapped_column(Integer)
+    onchain_index: Mapped[int] = mapped_column(Integer)  # id in the contract's anchors[] array
+    status: Mapped[str] = mapped_column(String(16), default="confirmed")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class SealAnchor(Base):
+    """Which batch a seal went into, plus its Merkle proof up to the batch root.
+    Kept outside the seals table: the ledger stays append-only and its hash chain untouched."""
+
+    __tablename__ = "seal_anchors"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    seal_id: Mapped[int] = mapped_column(ForeignKey("seals.id"), unique=True)
+    anchor_id: Mapped[int] = mapped_column(ForeignKey("anchors.id"), index=True)
+    proof_json: Mapped[str] = mapped_column(Text)  # [[side, sibling_hex], ...], see app.seal.merkle
+
+
+class AuditEvent(Base):
+    """Who did what, when, with what result (docs/SECURITY.md "Audit log"). Append-only:
+    the API only ever inserts and lists these rows — there is no update or delete endpoint."""
+
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    # seal | verify | device_create | device_revoke | anchor | auth_failed
+    action: Mapped[str] = mapped_column(String(32), index=True)
+    actor: Mapped[str] = mapped_column(String(200))  # admin | device:<name> | anonymous | inbox | scheduler
+    target: Mapped[str] = mapped_column(String(200), default="")  # e.g. seal:12, device:3, anchor:5
+    result: Mapped[str] = mapped_column(String(64), default="")  # e.g. sealed, authentic, forged, rejected:409
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)

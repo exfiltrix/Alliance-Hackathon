@@ -36,7 +36,7 @@ def triage(result: dict) -> tuple[str, list[str]]:
 def process(session: Session, data: bytes, file_name: str, source: str) -> InboxItem:
     """Verify one file and store it in the inbox. Unreadable files become red 'error' items."""
     try:
-        result = verify_upload(session, load_image(data))
+        result = verify_upload(session, load_image(data), actor=f"inbox:{source}")
         severity, reasons = triage(result)
         status = result["status"]
     except ImageError as e:

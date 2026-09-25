@@ -16,5 +16,13 @@ frontend/.next/
 
 .DS_Store
 .env*
+!.env.example
 medseal_check.png
 muhr.zip
+
+# contracts (Hardhat)
+contracts/node_modules/
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+contracts/coverage/

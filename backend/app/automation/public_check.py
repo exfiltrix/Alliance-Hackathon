@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.imaging import LoadedImage
 from app.models import PublicCheck, Seal, iso_utc
+from app.anchor import service as anchoring
 from app.verify.service import _check_row, verify_upload
 
 
@@ -34,6 +35,8 @@ def find(session: Session, token: str) -> Seal | None:
 def public_status(session: Session, seal: Seal) -> dict:
     """Is the seal record itself genuine? (Whether a given FILE matches it needs the file: see check_file.)"""
     device, reason, warning = _check_row(session, seal)
+    if reason is None and (anchoring.check(session, seal) or {}).get("status") == "mismatch":
+        reason = "blockchain_mismatch"
     return {
         "status": "invalid" if reason else ("warning" if warning else "valid"),
         "reason": reason or warning,
@@ -48,7 +51,7 @@ def check_file(session: Session, seal: Seal, image: LoadedImage) -> dict:
     """Does this file match the sealed image behind the link?"""
     if image.uid != seal.uid:
         return {"status": "mismatch"}  # a different image than the one this QR belongs to
-    result = verify_upload(session, image)
+    result = verify_upload(session, image, actor="patient-qr")
     return {
         "status": result["status"],
         "reason": result.get("reason"),

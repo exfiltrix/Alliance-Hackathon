@@ -16,7 +16,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from app import db
+from app import audit, db
 from app.automation import inbox
 from app.automation.public_check import token_for
 from app.config import settings
@@ -86,6 +86,8 @@ def seal_new_scans() -> int:
             with db.SessionLocal() as session:
                 image = load_image(path.read_bytes())
                 row, _ = seal_upload(session, image, gateway_device(session).id)
+                audit.log(session, "seal", f"device:{settings.gateway_name}", target=f"seal:{row.id}",
+                          result="sealed", ip="folder")
                 token_for(session, row.id)
                 sealed_file = settings.storage_dir / row.file_name  # with medseal_uid / stripped DICOM tags
             incoming_dir().mkdir(parents=True, exist_ok=True)

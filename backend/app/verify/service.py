@@ -3,15 +3,20 @@
 Status order matters: unsigned (no record) -> forged (record not authentic) ->
 tampered (tile mismatch) -> authentic. Changed tiles are only meaningful when
 the record itself is authentic.
+
+The blockchain check (app.anchor) runs for every sealed image. A mismatch means our own
+database was rewritten, so it overrides a locally clean result: forged / blockchain_mismatch.
 """
 import json
 import time
 
 from sqlalchemy.orm import Session
 
+from app import audit
 from app.ai import hooks
+from app.anchor import service as anchoring
 from app.imaging import LoadedImage, meta_fields, meta_hash, to_grayscale
-from app.models import Device, Verification
+from app.models import Device, Verification, iso_utc
 from app.seal import core, keys, ledger
 from app.verify.preview import render_preview
 
@@ -38,16 +43,20 @@ def _check_row(session: Session, row) -> tuple[Device | None, str | None, str | 
     return device, None, warning
 
 
-def verify_upload(session: Session, image: LoadedImage) -> dict:
+def verify_upload(session: Session, image: LoadedImage, actor: str = "anonymous", ip: str | None = None) -> dict:
     t0 = time.perf_counter()
     row = ledger.find_by_uid(session, image.uid) if image.uid else None
-    result = {"status": "", "uid": image.uid, "device": None, "seal_id": None, "changed_tiles": [], "tile": None}
+    result = {"status": "", "uid": image.uid, "device": None, "seal_id": None, "changed_tiles": [], "tile": None,
+              "blockchain": None}
 
     if row is None:
         result["status"] = "unsigned"
     else:
         device, reason, warning = _check_row(session, row)
-        result.update(device=device.name if device else None, seal_id=row.id, tile=row.tile)
+        blockchain = anchoring.check(session, row)
+        if reason is None and (blockchain or {}).get("status") == "mismatch":
+            reason = "blockchain_mismatch"
+        result.update(device=device.name if device else None, seal_id=row.id, tile=row.tile, blockchain=blockchain)
         if reason:
             result.update(status="forged", reason=reason)
         else:
@@ -66,6 +75,7 @@ def verify_upload(session: Session, image: LoadedImage) -> dict:
             result.update(
                 status="tampered" if (changed or meta_changed) else "authentic",
                 changed_tiles=[list(k) for k in changed],
+                sealed_at=iso_utc(row.created_at),  # T6: a replayed old image shows its original date
             )
             if meta_changed:
                 result.update(reason="metadata_changed", changed_meta=changed_meta)
@@ -91,5 +101,8 @@ def verify_upload(session: Session, image: LoadedImage) -> dict:
             shield_flag=(result["shield"] or {}).get("attack_suspected"),
         )
     )
+    outcome = result["status"] + (f":{result['reason']}" if result.get("reason") else "")
+    audit.log(session, "verify", actor, target=f"seal:{row.id}" if row else f"uid:{image.uid or '-'}",
+              result=outcome, ip=ip)
     session.commit()
     return result

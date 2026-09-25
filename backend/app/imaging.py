@@ -14,6 +14,8 @@ import pydicom
 from PIL import Image, PngImagePlugin
 from pydicom.uid import generate_uid
 
+from app.config import settings
+
 PNG_UID_KEY = "medseal_uid"
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 
@@ -40,6 +42,15 @@ PATIENT_TAGS = (
 
 class ImageError(ValueError):
     """Upload is not a supported image. Message is safe to show to the user."""
+
+
+class ImageTooLarge(ImageError):
+    """Decodes to more pixels than settings.max_pixels (decompression bomb, T10)."""
+
+
+def _check_pixels(n: int) -> None:
+    if n > settings.max_pixels:
+        raise ImageTooLarge(f"Image is too large: {n} pixels (limit {settings.max_pixels})")
 
 
 @dataclass
@@ -76,6 +87,11 @@ def _load_dicom(data: bytes) -> LoadedImage:
         raise ImageError(f"Cannot read DICOM file: {e}") from e
     strip_patient_tags(ds)
     try:
+        declared = int(ds.Rows) * int(ds.Columns) * int(getattr(ds, "NumberOfFrames", 1) or 1)
+    except Exception as e:
+        raise ImageError("DICOM has no valid Rows/Columns") from e
+    _check_pixels(declared)  # before pixel_array decodes anything
+    try:
         px = ds.pixel_array
     except Exception as e:
         raise ImageError(f"Cannot decode DICOM pixel data: {e}") from e
@@ -87,7 +103,11 @@ def _load_dicom(data: bytes) -> LoadedImage:
 
 def _load_png(data: bytes) -> LoadedImage:
     try:
-        img = Image.open(io.BytesIO(data))
+        img = Image.open(io.BytesIO(data))  # reads the header only
+    except Exception as e:
+        raise ImageError(f"Cannot read PNG file: {e}") from e
+    _check_pixels(img.width * img.height)  # before img.load() decompresses anything
+    try:
         img.load()
     except Exception as e:
         raise ImageError(f"Cannot read PNG file: {e}") from e

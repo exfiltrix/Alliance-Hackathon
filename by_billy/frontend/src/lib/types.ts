@@ -1,4 +1,4 @@
-// Shapes mirror /API.md in the repo root (the backend contract) — keep both in sync.
+// Shapes mirror docs/API.md in the repo root (the backend contract) — keep both in sync.
 
 export type Device = {
   id: number;
@@ -74,7 +74,12 @@ export type CheckFileResult = {
 
 export type VerifyStatus = "authentic" | "tampered" | "unsigned" | "forged";
 
-export type ForgedReason = "ledger_entry_modified" | "bad_signature" | "device_revoked" | "unknown_device";
+export type ForgedReason =
+  | "ledger_entry_modified"
+  | "bad_signature"
+  | "device_revoked"
+  | "unknown_device"
+  | "blockchain_mismatch"; // our database no longer matches the root anchored on-chain
 // P0-5: appears on `tampered` too, when display metadata (RescaleIntercept, Laterality...)
 // was edited without touching pixels.
 export type TamperedReason = ForgedReason | "metadata_changed";
@@ -91,11 +96,24 @@ export type VerifyResponse = {
   // Non-fatal: the device was revoked AFTER this seal was made, so it is still trusted.
   warning?: "device_revoked_later";
   verify_ms?: number;
+  sealed_at?: string; // on authentic/tampered: when and (device) by whom the image was sealed
+  // null when anchoring is off on the backend or the image is unsigned. See API.md.
+  blockchain?: BlockchainCheck | null;
   preview_png: string;
   // null when the AI is off on the backend; the detective key only exists for unsigned images
   detective?: { probability: number; heatmap_png: string; experimental: boolean } | null;
   shield: { attack_suspected: boolean; score: number; threshold: number } | null;
   note: string;
+};
+
+export type BlockchainCheck = {
+  status: "anchored" | "pending" | "mismatch" | "unavailable";
+  detail?: "proof_missing" | "anchor_record_missing";
+  block?: number;
+  time?: string; // on-chain block time of the batch
+  tx_hash?: string;
+  tx_url?: string | null; // block explorer link; null on a local chain
+  chain_id?: number;
 };
 
 export type AiModel = {

@@ -3,11 +3,12 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import db
+from app import db, security
 from app.config import settings
 from app.db import init_engine
+from app.anchor import chain as anchor_chain, service as anchoring
 from app.automation import warmup, watcher
-from app.routers import check, crash_test, devices, inbox, passport, seal, stats, verify
+from app.routers import anchors, audit, check, crash_test, devices, inbox, passport, seal, stats, verify
 
 
 @asynccontextmanager
@@ -19,11 +20,15 @@ async def lifespan(app: FastAPI):
         warmup.start()
     if settings.watch_enabled:
         watcher.start()
+    if settings.anchor_enabled and anchor_chain.configured():
+        anchoring.start()
     yield
     watcher.stop()
+    anchoring.stop()
 
 
 app = FastAPI(title="MedSeal API", version="0.1.0", lifespan=lifespan)
+security.install(app)  # before CORS: CORS must stay the outermost middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -34,7 +39,7 @@ app.add_middleware(
 )
 
 for r in (devices.router, seal.router, verify.router, inbox.router, check.router, crash_test.router, passport.router,
-          stats.router):
+          stats.router, anchors.router, audit.router):
     app.include_router(r, prefix="/api")
 
 

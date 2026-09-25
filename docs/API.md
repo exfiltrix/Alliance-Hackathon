@@ -3,7 +3,7 @@
 All image uploads: `multipart/form-data`, field `file` (DICOM `.dcm` or `.png`). Images returned as base64 PNG previews (no `data:` prefix — use `data:image/png;base64,${preview_png}`).
 Interactive docs while the backend runs: http://localhost:8000/docs. CORS allows `http://localhost:3000`.
 
-Errors: `{"detail": "message"}` with status `404` (not found), `409` (conflict), `413` (file too large, > 50 MB), `415` (not a DICOM/PNG), `422` (missing/invalid field).
+Errors: `{"detail": "message"}` with status `404` (not found), `409` (conflict), `413` (file too large, > 50 MB, or decodes to > 64 Mpx), `429` (more than 120 POSTs per minute from one IP; `Retry-After` header), `415` (not a DICOM/PNG), `422` (missing/invalid field).
 All times are UTC ISO strings: `"2026-09-26T10:00:00Z"`.
 
 ## Devices
@@ -50,6 +50,9 @@ there is no `device_id` field anymore (a client can no longer seal as an arbitra
   "uid": "…", "device": "KT-01", "seal_id": 12,
   "changed_tiles": [[64,16],[64,32]], "tile": 32,
   "warning": "device_revoked_later",
+  "sealed_at": "2026-09-26T10:00:00Z",
+  "blockchain": { "status": "anchored", "block": 6712345, "time": "2026-09-26T10:10:12Z",
+                  "tx_hash": "0x…", "tx_url": "https://sepolia.etherscan.io/tx/0x…", "chain_id": 11155111 },
   "verify_ms": 1.1,
   "preview_png": "base64…",
   "detective": { "probability": 0.87, "heatmap_png": "base64…", "experimental": false },
@@ -58,7 +61,13 @@ there is no `device_id` field anymore (a client can no longer seal as an arbitra
 ```
 - `changed_tiles`: `[y, x]` of the top-left corner of each changed tile, in original image pixels; tile size is `tile`. `preview_png` already has red boxes drawn on them (preview is scaled down to max 1024 px).
 - `unsigned`: `uid`, `device`, `seal_id`, `tile` are `null`.
-- `forged`: extra field `reason` = `ledger_entry_modified | bad_signature | device_revoked | unknown_device`; `changed_tiles` is empty (tiles are not compared against an untrusted record).
+- `forged`: extra field `reason` = `ledger_entry_modified | bad_signature | device_revoked | unknown_device | blockchain_mismatch`; `changed_tiles` is empty (tiles are not compared against an untrusted record).
+- `sealed_at` (on `authentic`/`tampered`): when the image was sealed — together with `device` it exposes a replayed old image (threat T6).
+- `blockchain` (docs/BLOCKCHAIN.md): `null` when anchoring is off on the backend or the image is `unsigned`. Otherwise `status` =
+  - `anchored` — the ledger entry matches the Merkle root stored on-chain (read from the chain, not our DB); `block`, `time` (on-chain block time), `tx_hash`, `tx_url` (explorer link, `null` on a local chain), `chain_id`.
+  - `pending` — sealed after the last batch; anchored within ~10 min (`POST /anchors/run` in the demo).
+  - `unavailable` — the chain could not be reached; the seal check above still stands.
+  - `mismatch` — **critical**: our database was rewritten after anchoring (`detail: "proof_missing"` if the proof itself was deleted). Always comes with `status: "forged"`, `reason: "blockchain_mismatch"`, even when every local check passed — an insider with the database and the device keys can fool those, not the chain. Show the Etherscan link: the original fingerprint and time are there.
 - `tampered` can also carry `reason: "metadata_changed"` + `changed_meta: [tag names]` when a display-affecting DICOM tag (RescaleSlope/Intercept, WindowCenter/Width, Laterality, PixelSpacing, ...) was edited without touching any pixel — those tags never touch tile hashes, so they are bound into the signature separately (P0-5).
 - `warning` (optional, on `authentic`/`tampered` only) = `device_revoked_later`: the device was revoked **after** this particular seal was made, so the seal itself is still trusted — revocation is not retroactive. A seal made at/after the device's `revoked_at` is `forged`/`device_revoked` instead, not a warning.
 - `detective` key is present only when `status == "unsigned"` (a sealed image is checked by the seal, exactly). `detective` / `shield` are `null` when the AI is off (`MEDSEAL_AI=0`, torch not installed, detective not trained) — the UI must handle `null` for both.
@@ -66,6 +75,14 @@ there is no `device_id` field anymore (a client can no longer seal as an arbitra
 - `shield` runs on every status, including `authentic`: the seal proves where the image came from, the shield checks whether its pixels carry an adversarial attack (an attacked image can be sealed too).
 - `shield.score` is a distance, not a percentage (clean X-rays ≈ 3–8, attacked ≈ 10–100+); `attack_suspected = score > threshold`. Show it as "Yashirin hujum aniqlandi" / "Shubhali shovqin topilmadi" plus `score / threshold`, not as "87%". About 1% of clean images raise a false alarm, so it is a warning, not a verdict. Takes ~50 ms (first call after startup ~2 s: model load).
 - UI labels: `authentic`/`tampered`/`forged` are certain ("Tasdiqlangan"); `detective` is a probability ("Ehtimollik 87%"), `shield` is a warning (see above).
+
+## Blockchain anchoring
+`GET /anchors` → `{ "enabled": true, "pending": 3, "anchors": [ {id, root, count, tx_hash, tx_url, block, chain_id, onchain_index, status, created_at}, … ] }` (newest first; `enabled: false` = anchoring off).
+`POST /anchors/run` — admin token. Anchors every pending seal now, waits for the confirmation (local chain: instant; Sepolia ~15 s). → `{ "anchored": 5, "anchor": {…} }` or `{ "anchored": 0, "anchor": null }`; `503` if anchoring is off or the chain is unreachable (sealing and verifying keep working).
+
+## Audit log
+`GET /audit?limit=200&action=seal` — admin token. Newest first: `[{id, at, action, actor, target, result, ip}]`.
+`action` = `seal | verify | device_create | device_revoke | anchor | auth_failed`; `actor` = `admin`, `device:<name>`, `anonymous`, `inbox:upload|folder`, `patient-qr`, `scheduler`. There is no endpoint that changes or deletes audit rows.
 
 ## Automation (no clicks)
 Folders (backend setting `MEDSEAL_WATCH_DIR`, default `data/watch`), polled every 2 s while the backend runs (`MEDSEAL_WATCH=0` turns it off):

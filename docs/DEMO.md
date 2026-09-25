@@ -16,6 +16,13 @@ Then upload the original → green "Tasdiqlangan".
 Open `/crash-test` → before/after: healthy X-ray, AI says ~8% pneumonia → after invisible noise ~93%.
 Show the shield on `/verify`: "Yashirin hujum aniqlandi".
 
+## 3b. Even we can't cheat (30 s)
+Before the demo: the original from step 1 is anchored (`POST /api/anchors/run`, or wait 10 min).
+Play the insider who has our database AND the device keys: `python -m scripts.rewrite_history_demo <seal_id> --image <fake>.png` — it re-signs the fake into the ledger and repairs the hash chain ("local ledger check: clean").
+Upload the fake to `/verify` again → **"Blockchain mismatch"** (without the chain it would now say "Tasdiqlangan"). Click the Etherscan link: the original fingerprint and time are on-chain.
+Say: "Nobody can rewrite the history of seals — not a hacker, not a hospital, not us."
+Offline backup: the same with a local chain (`npx hardhat node`), just no Etherscan link.
+
 ## 4. Passport (20 s)
 Open the model's passport: robustness score, verdict, PDF.
 Say: "This is the standard task №6 asks for: every AI model gets a passport before it touches patients."
@@ -36,4 +43,6 @@ Growth: pilot hospital → all regions → Central Asia.
 | Old images? | Archive can be sealed once from today; the detective covers images without a seal. |
 | Does it slow doctors down? | Seal/verify takes milliseconds per image. |
 | Does this already exist? | The science exists and *Radiology* recommends signatures at capture; we found no product that combines seal + detective + crash test + passport, and nothing in Uzbekistan. |
+| Why blockchain, not just a database? | A database can be edited by its admin. The chain holds the fingerprint where no one, including us, can change it. Only hashes go on-chain — no patient data. |
+| How secure is it? | Standard primitives: SHA-256 (FIPS 180-4), Ed25519 (FIPS 186-5), TLS 1.3; 12-point threat model; we just showed four attacks being caught live. |
 | Legal side? | No patient names stored, data stays in Uzbekistan, AI only advises — the doctor decides. |

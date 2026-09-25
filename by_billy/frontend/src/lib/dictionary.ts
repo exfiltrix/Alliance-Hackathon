@@ -464,6 +464,11 @@ const dictionary = {
         en: "The device has been revoked.",
       },
       unknown_device: { uz: "Qurilma noma'lum.", ru: "Устройство неизвестно.", en: "Unknown device." },
+      blockchain_mismatch: {
+        uz: "Ma'lumotlar bazasi blokcheyndagi yozuvga mos kelmaydi — muhr tarixi o'zgartirilgan.",
+        ru: "База данных не совпадает с записью в блокчейне — историю печатей переписали.",
+        en: "The database no longer matches the blockchain record — the seal history was rewritten.",
+      },
       metadata_changed: {
         uz: "Tibbiy metama'lumotlar o'zgartirilgan (masalan, HU shkalasi yoki tomon).",
         ru: "Изменены медицинские метаданные (например, шкала HU или сторона снимка).",

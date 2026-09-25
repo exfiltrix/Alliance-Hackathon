@@ -19,6 +19,8 @@ Rule: at the end of every day the demo must run end-to-end, even if parts are st
 - [ ] (5) pitch outline: patient story → threat → demo → standard → business
 
 ## Day 2 — all features
+- [ ] (1) deploy `MedSealAnchor` on Sepolia (Remix), verify source on Etherscan
+- [ ] (1) anchoring service + Merkle proofs + `blockchain` field in verify; test: DB edit → mismatch
 - [ ] (1) PNG `medseal_uid` chunk, hash-chain ledger, `/stats`
 - [ ] (2) crash test job over 50 images, flip rate per eps, robustness score
 - [ ] (2) shield: calibrate threshold on clean images, flag attacked ones
@@ -34,6 +36,8 @@ Rule: at the end of every day the demo must run end-to-end, even if parts are st
 - [ ] (5) record backup video of the full demo; final slides; Q&A practice
 
 ## Useful prompts for Claude Code
+- "Implement blockchain anchoring per `docs/BLOCKCHAIN.md`: contract in `contracts/`, service in `backend/app/anchor/`, proofs stored per seal, and the `blockchain` field in `/api/verify`."
+- "Go through `docs/SECURITY.md` and add a pytest for every threat marked ✅."
 - "Port `reference/medseal_poc.py` into `backend/app/seal/` as a module with functions `seal_image`, `verify_image`; add pytest tests for the three scenarios in the reference."
 - "Implement `POST /api/verify` per `docs/API.md`, returning a PNG preview with red rectangles on changed tiles."
 - "Implement targeted FGSM and PGD in `backend/app/ai/attacks.py` for the torchxrayvision DenseNet, target class 'Pneumonia', eps given in 0–255 pixel units."

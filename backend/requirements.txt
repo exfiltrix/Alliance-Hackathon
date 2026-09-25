@@ -9,6 +9,8 @@ cryptography>=43
 pillow>=11
 fpdf2>=2.8  # passport PDF
 qrcode>=7.4  # patient QR check
+python-dotenv>=1.0  # secrets from backend/.env
+web3>=7,<9  # blockchain anchoring (app/anchor)
 
 # tests
 pytest>=8

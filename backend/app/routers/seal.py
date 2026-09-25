@@ -1,10 +1,11 @@
 import json
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import audit
 from app.auth import require_device
 from app.automation.public_check import token_for
 from app.config import settings
@@ -33,15 +34,22 @@ def seal_json(row: Seal) -> dict:
 
 @router.post("/seal")
 async def seal(
+    request: Request,
     file: UploadFile = File(...),
     device: Device = Depends(require_device),
     session: Session = Depends(get_session),
 ):
     image = await read_upload(file)
+    actor, ip = f"device:{device.name}", audit.client_ip(request)
     try:
         row, elapsed_ms = seal_upload(session, image, device.id)
     except SealError as e:
+        session.rollback()
+        audit.log(session, "seal", actor, target=f"uid:{image.uid or '-'}", result=f"rejected:{e.status}", ip=ip)
+        session.commit()
         raise HTTPException(e.status, str(e)) from e
+    audit.log(session, "seal", actor, target=f"seal:{row.id}", result="sealed" if elapsed_ms else "already_sealed", ip=ip)
+    session.commit()
     return seal_json(row) | {"seal_ms": round(elapsed_ms, 2), "check_token": token_for(session, row.id)}
 
 

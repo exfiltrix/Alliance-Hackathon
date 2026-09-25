@@ -65,7 +65,10 @@ Output: one score per pathology in `model.pathologies` (use "Pneumonia" for the 
 | Table | Columns |
 |---|---|
 | devices | id, name, hospital, public_key_hex, revoked, created_at |
-| seals | id, uid, device_id, created_at, shape, dtype, tile, leaves_json, root_hex, sig_hex, prev_hash, entry_hash |
+| seals | id, uid, device_id, created_at, shape, dtype, tile, leaves_json, root_hex, meta_hash_hex, meta_json, sig_hex, prev_hash, entry_hash, file_name |
+| anchors | id, batch_root_hex, count, tx_hash, block_number, chain_id, onchain_index, status, created_at — one row per confirmed on-chain batch (docs/BLOCKCHAIN.md) |
+| seal_anchors | id, seal_id, anchor_id, proof_json — kept out of `seals` so the ledger stays append-only |
+| audit_log | id, at, action, actor, target, result, ip — insert/list only (docs/SECURITY.md) |
 | verifications | id, uid, result (authentic/tampered/unsigned/forged), changed_tiles_json, detective_prob, shield_flag, created_at |
 | models | id, name, version, source, intended_use |
 | crash_tests | id, model_id, n_images, results_json, robustness_score, created_at |
