@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/language-context";
@@ -29,10 +30,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: INIT_SCRIPT }} />
-      </head>
       <body className="min-h-full flex flex-col">
+        {/* beforeInteractive: Next injects it into <head> and runs it before hydration. A raw <script>
+            inside a React component is never executed on the client (React 19 console error). */}
+        <Script id="medseal-init" strategy="beforeInteractive">
+          {INIT_SCRIPT}
+        </Script>
         <LanguageProvider>
           <SkipLink />
           {children}
