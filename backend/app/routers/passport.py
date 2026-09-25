@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.auth import require_admin
 from app.db import get_session
-from app.models import AIModel, CrashTest, Passport, iso_utc
-from app.passport import pdf, report
+from app.models import AIModel, CrashTest, Passport, iso_utc, utcnow
+from app.passport import pdf, report, signing
+from app.seal import keys
 
 router = APIRouter(tags=["passport"])
 
@@ -26,6 +27,8 @@ def passport_json(p: Passport) -> dict:
         "created_at": iso_utc(p.created_at),
         "organisation": p.organisation,
         **json.loads(p.report_json),
+        "fingerprint": signing.fingerprint(p),
+        "verify_url": f"/api/passport/{p.id}/verify",
     }
 
 
@@ -74,11 +77,25 @@ def issue_passport(body: PassportIn, session: Session = Depends(get_session)):
         verdict=data["verdict"],
         conditions=json.dumps(data["conditions"]),
         organisation=body.organisation.strip(),
-        report_json=json.dumps(data),
+        report_json=json.dumps(data, sort_keys=True, separators=(",", ":")),
+        created_at=utcnow(),
     )
     session.add(p)
+    session.flush()
+    try:
+        keys.ensure_root_key()
+        signing.sign(p)
+    except (OSError, KeyError, TypeError, ValueError) as exc:
+        session.rollback()
+        raise HTTPException(503, "Passport signing key is not configured") from exc
     session.commit()
     return passport_json(p)
+
+
+@router.get("/passport/{passport_id}/verify")
+def verify_passport(passport_id: int, session: Session = Depends(get_session)):
+    p = _get(session, passport_id)
+    return {"valid": signing.verify(p), "fingerprint": signing.fingerprint(p)}
 
 
 @router.get("/passport/{passport_id}")

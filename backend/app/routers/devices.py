@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.auth import hash_token, new_device_token, require_admin
 from app.db import get_session
-from app.models import Device, iso_utc
+from app.models import Device, iso_utc, utcnow
 from app.seal import keys
 
 router = APIRouter(prefix="/devices", tags=["devices"])
@@ -43,10 +43,15 @@ def create_device(body: DeviceIn, session: Session = Depends(get_session)):
     the private key itself (e.g. MEDSEAL_DEVICE_TOKEN in the gateway's own .env, never in
     a browser-exposed NEXT_PUBLIC_* variable).
     """
-    device = Device(name=body.name, hospital=body.hospital, public_key_hex="")
+    try:
+        keys.ensure_root_key()
+    except (OSError, KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(503, "Root signing key is not configured") from exc
+    device = Device(name=body.name, hospital=body.hospital, public_key_hex="", created_at=utcnow())
     session.add(device)
     session.flush()
     device.public_key_hex = keys.create_device_key(device.id)
+    keys.certify_device(device)
     token = new_device_token()
     device.token_hash = hash_token(token)
     session.commit()
@@ -61,10 +66,11 @@ def revoke_device(device_id: int, session: Session = Depends(get_session)):
     device = session.get(Device, device_id)
     if device is None:
         raise HTTPException(404, "Device not found")
-    device.revoked = True
-    # Full precision (not the whole-second utcnow() used for hashed ledger timestamps): revoked_at
-    # is never part of a hash, and second-level rounding could otherwise tie with a seal's
-    # created_at made moments earlier in the same test/request burst.
-    device.revoked_at = datetime.now(timezone.utc)
+    if not device.revoked:
+        device.revoked = True
+        # Full precision (not the whole-second utcnow() used for hashed ledger timestamps): revoked_at
+        # is never part of a hash, and second-level rounding could otherwise tie with a seal's
+        # created_at made moments earlier in the same test/request burst.
+        device.revoked_at = datetime.now(timezone.utc)
     session.commit()
     return device_json(device)

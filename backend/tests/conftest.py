@@ -19,6 +19,10 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "db_url", f"sqlite:///{tmp_path / 'test.db'}")
     monkeypatch.setattr(settings, "keys_dir", tmp_path / "keys")
     monkeypatch.setattr(settings, "storage_dir", tmp_path / "storage")
+    monkeypatch.setattr(settings, "root_key_path", tmp_path / "root.pem")
+    monkeypatch.setattr(settings, "root_pubkey_path", tmp_path / "root.pub")
+    monkeypatch.setattr(settings, "anchor_path", tmp_path / "anchors.jsonl")
+    monkeypatch.setattr(settings, "require_device_cert", True)
     monkeypatch.setattr(settings, "ai_enabled", False)  # AI tests switch it on themselves
     monkeypatch.setattr(settings, "admin_token", ADMIN_TOKEN)
     from app.main import app

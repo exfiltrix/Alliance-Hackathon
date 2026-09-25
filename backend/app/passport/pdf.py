@@ -79,6 +79,8 @@ def render(p: dict, lang: str = "uz") -> bytes:
     doc.rows([
         (t["issued"], date),
         (t["organisation"], p["organisation"] or "—"),
+        (t["fingerprint"], p.get("fingerprint", "—")),
+        (t["verify_path"], p.get("verify_url", "—")),
     ], key_w=55)
 
     # verdict first: it is what the reader is looking for
@@ -123,6 +125,7 @@ def render(p: dict, lang: str = "uz") -> bytes:
     doc.text(8, t["formula"], color=MUTED, w=text_w)
     doc.text(8, t["crash_test"].format(n=r["n_images"], method=r["method"].upper(), pathology=pathology,
                                        date=r["tested_at"][:10]), color=MUTED, w=text_w)
+    doc.text(7.5, f"{t['protocol']}: {t['protocol_value']} · {t['images_requested']}: {r.get('n_requested', r['n_images'])} · {t['images_loaded']}: {r['n_images']}", color=MUTED, w=text_w)
     doc.ln(1.5)
 
     # flip-rate table with bars (left) + before/after example (right)
@@ -176,6 +179,12 @@ def render(p: dict, lang: str = "uz") -> bytes:
             (t["shield_pgd"], _pct(s["detection_pgd_eps1"])),
             (t["shield_fgsm"], _pct(s["detection_fgsm_eps1"])),
         ]
+        ci = s.get("confidence_intervals", {})
+        if ci:
+            detection = ci["detection_pgd_eps1"]
+            fpr = ci["false_positive_rate"]
+            rows.append((t["shield_ci"], f"PGD {detection['lower']:.3f}–{detection['upper']:.3f}; FPR {fpr['lower']:.4f}–{fpr['upper']:.4f}"))
+        rows.append((t["adaptive_note"], ""))
     doc.rows(rows)
 
     # pipeline
