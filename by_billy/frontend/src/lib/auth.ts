@@ -26,13 +26,28 @@ function subscribe(cb: () => void) {
   };
 }
 
+// useSyncExternalStore requires getSnapshot to return the SAME reference when nothing changed;
+// JSON.parse-ing on every call would return a new object each render and loop forever, so cache
+// by the raw string (same pattern as src/lib/a11y.ts).
+let cache: { raw: string | null; value: AuthSession | null } = { raw: null, value: null };
+
 function getSnapshot(): AuthSession | null {
+  let raw: string | null;
   try {
-    const raw = window.localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as AuthSession) : null;
+    raw = window.localStorage.getItem(KEY);
   } catch {
     return memorySession;
   }
+  if (raw !== cache.raw) {
+    let value: AuthSession | null = null;
+    try {
+      value = raw ? (JSON.parse(raw) as AuthSession) : null;
+    } catch {
+      value = null;
+    }
+    cache = { raw, value };
+  }
+  return cache.value;
 }
 
 export function login(session: AuthSession) {
