@@ -23,7 +23,7 @@ class CrashTestError(Exception):
 
 
 def image_files() -> list[Path]:
-    dirs = [settings.data_dir / "xray" / "normal", settings.data_dir / "samples"]
+    dirs = [settings.data_dir / "nih" / "normal", settings.data_dir / "samples"]
     return [p for d in dirs if d.is_dir() for p in sorted(d.iterdir()) if p.suffix.lower() in IMAGE_SUFFIXES]
 
 

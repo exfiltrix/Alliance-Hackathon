@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Текущее состояние репозитория
 
 - Работа поделена: backend ведёт владелец репозитория, frontend — второй разработчик. Контракт между ними — `API.md`; любое изменение ответа API сразу отражать там.
-- Backend (день 1) готов: устройства, печать, проверка, реестр с hash-chain, `/stats`. `app/ai/hooks.py` — заглушки детектива и щита (возвращают `None` → `null` в API), сюда подключаются ИИ-модули.
+- Backend готов: устройства, печать, проверка, реестр с hash-chain, `/stats`, краш-тест, щит. `app/ai/hooks.py` — точка подключения ИИ к `/verify`: щит подключён, детектив пока заглушка (`None` → `null`).
 - `frontend/` ещё не создан.
 - Документы лежат **в корне** (`SPEC.md`, `ARCHITECTURE.md`, `API.md`, `TASKS.md`, `DEMO.md`), хотя в них упоминается путь `docs/…`.
 - `reference/medseal_poc.py` извлечён из `muhr.zip`; остальное содержимое архива дублирует файлы в корне.
@@ -73,8 +73,11 @@ cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # AI (torch CPU; работает на 3.14). Веса DenseNet кешируются в ~/.torchxrayvision
 .venv/bin/pip install -r requirements-ai.txt --extra-index-url https://download.pytorch.org/whl/cpu
 .venv/bin/python -m scripts.fetch_samples          # публичные рентгены в data/samples + веса (нужен интернет один раз)
-.venv/bin/python -m scripts.attack_demo ../data/samples/00000001_000.png --eps 1 --method pgd   # до/после в data/demo
+.venv/bin/python -m scripts.attack_demo ../data/samples/00000001_000.png --eps 2 --method pgd   # до/после в data/demo; eps 2 — щит ловит с запасом
+.venv/bin/python -m scripts.fetch_dataset          # NIH (data/nih) + Kermany (data/xray), нужен pyarrow
+.venv/bin/python -m scripts.calibrate_shield       # порог щита -> app/ai/shield_calibration.json (~5 мин)
 .venv/bin/pytest -m "not ai"                        # быстрые тесты без модели; ИИ-тесты сами пропускаются без весов/снимков
+# MEDSEAL_AI=0 выключает щит/детектива в /verify (в тестах выключены по умолчанию, ИИ-тесты включают сами)
 # скрипты запускать из backend/ через -m (им нужен пакет app)
 
 # frontend
@@ -103,7 +106,8 @@ python reference/medseal_poc.py
 - Атака сама выбирает направление: здоровый снимок толкает вверх через 0.5, больной — вниз.
 - eps в атаках задаётся в пикселях 0–255 (`[0.5, 1, 2, 4]`) и умножается на `2048/255` для нормализованного пространства. PGD = 10 шагов с шагом `eps/4` и проекцией на eps-шар.
 - Оценка устойчивости: `round(10 × (1 − flip_rate при eps=1), 1)` — формулу нужно объяснять в паспорте.
-- Щит: `d = max |score(orig) − score(squeezed)|` по патологиям для медианы 3×3 и 5-битной глубины; порог = 95-й перцентиль `d` на чистых снимках, калибруется один раз и сохраняется в конфиг.
+- Щит: `d = Σ |logit(orig) − logit(median3×3)|` по патологиям на картинке 224×224, которую видит модель (сырые логиты, не калиброванные оценки). Порог = 99-й перцентиль `d` на чистых взрослых снимках NIH, лежит в `app/ai/shield_calibration.json` (коммитится). После смены модели или предобработки — перекалибровать. Детский датасет Kermany для калибровки и краш-теста не годится: для модели это чужой домен.
+- Данные: `data/nih/{normal,findings}` (NIH ChestX-ray14, основной набор), `data/xray/{normal,pneumonia}` (Kermany, для детектива).
 
 **Целевые показатели:** печать/проверка < 50 мс на снимок; щит < 1 с; краш-тест на 50 снимках < 2 мин на CPU.
 

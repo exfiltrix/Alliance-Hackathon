@@ -1,0 +1,48 @@
+{
+  "method": "median 3x3, L1 distance of DenseNet logits",
+  "threshold": 10.419,
+  "percentile": 99,
+  "dataset": "NIH ChestX-ray14 (CC0), 300 px subset: No Finding + findings",
+  "n_calibration": 450,
+  "n_held_out": 450,
+  "false_positive_rate": 0.009,
+  "detection_rate": {
+    "fgsm": {
+      "0.5": {
+        "attacks_that_fooled_model": 3,
+        "detected": 0.0
+      },
+      "1": {
+        "attacks_that_fooled_model": 21,
+        "detected": 0.6190476190476191
+      },
+      "2": {
+        "attacks_that_fooled_model": 30,
+        "detected": 0.8666666666666667
+      },
+      "4": {
+        "attacks_that_fooled_model": 30,
+        "detected": 1.0
+      }
+    },
+    "pgd": {
+      "0.5": {
+        "attacks_that_fooled_model": 5,
+        "detected": 0.2
+      },
+      "1": {
+        "attacks_that_fooled_model": 29,
+        "detected": 1.0
+      },
+      "2": {
+        "attacks_that_fooled_model": 30,
+        "detected": 1.0
+      },
+      "4": {
+        "attacks_that_fooled_model": 30,
+        "detected": 1.0
+      }
+    }
+  },
+  "created_at": "2026-09-25T06:21:34Z"
+}

@@ -16,6 +16,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "db_url", f"sqlite:///{tmp_path / 'test.db'}")
     monkeypatch.setattr(settings, "keys_dir", tmp_path / "keys")
     monkeypatch.setattr(settings, "storage_dir", tmp_path / "storage")
+    monkeypatch.setattr(settings, "ai_enabled", False)  # AI tests switch it on themselves
     from app.main import app
 
     with TestClient(app) as c:

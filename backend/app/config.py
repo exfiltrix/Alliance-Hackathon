@@ -23,8 +23,10 @@ class Settings:
         ).split(",")
     )
     max_upload_bytes: int = 50 * 1024 * 1024
-    # Public/synthetic images (scripts/fetch_*.py). Crash test reads data/xray/normal, then data/samples.
+    # Public/synthetic images (scripts/fetch_*.py). Crash test reads data/nih/normal, then data/samples.
     data_dir: Path = _path("MEDSEAL_DATA_DIR", BACKEND_DIR.parent / "data")
+    # Run the AI shield/detective inside /verify (needs torch + weights). MEDSEAL_AI=0 turns them off.
+    ai_enabled: bool = os.environ.get("MEDSEAL_AI", "1") != "0"
 
 
 settings = Settings()

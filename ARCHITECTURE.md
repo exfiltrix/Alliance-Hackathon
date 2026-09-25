@@ -48,9 +48,10 @@ Output: one score per pathology in `model.pathologies` (use "Pneumonia" for the 
 - Robustness score: `10 × (1 − flip_rate at eps=1)`, rounded to 1 decimal. Explain the formula in the passport.
 
 ### Shield (`ai/shield.py`) — feature squeezing, no training needed
-- Predict on the image and on squeezed versions (3×3 median filter; bit-depth reduction to 5 bits).
-- `d = max |score(original) − score(squeezed)|` over pathologies.
-- Threshold = 95th percentile of `d` on clean images (calibrate once, save to config). `d > threshold` → "attack suspected".
+- Work on the 224×224 8-bit picture the model sees (the attack lives at that scale). Squeeze it with a 3×3 median filter.
+- `d = Σ over pathologies |logit(original) − logit(squeezed)|` — raw logits, not the `op_threshs`-calibrated scores (calibration stretches small changes near each threshold, so clean images looked as unstable as attacked ones). 5-bit depth reduction was tried and caught fewer attacks.
+- Threshold = 99th percentile of `d` on clean **adult** X-rays (NIH ChestX-ray14 subset, `scripts/calibrate_shield.py` → `app/ai/shield_calibration.json`, committed). 95th gave 8% false alarms. Calibrating on the paediatric Kermany set does not transfer: the model is out of domain there and `d` on clean images is ~4× larger.
+- Measured on held-out NIH images: false alarms 0.9%; PGD caught 100% at eps ≥ 1 px, FGSM 62% / 87% / 100% at eps 1 / 2 / 4. Weak attacks (eps 0.5, which rarely fool the model on adult images) slip through — say so honestly.
 
 ### Detective (`ai/detective.py`) — for unsigned images
 - Data: public chest X-rays (e.g. Kaggle "Chest X-Ray Images (Pneumonia)"). Generate fakes automatically in `scripts/make_fakes.py`:
