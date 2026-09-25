@@ -234,9 +234,17 @@ export default function RegisterPage() {
 
         <p className="text-xs text-muted">{t(d.demoNote)}</p>
 
-        <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
-          {submitting ? t(d.submitting) : t(d.submit)}
-        </Button>
+        <div className="flex flex-wrap items-center gap-4">
+          <Button type="submit" disabled={submitting} className="w-full sm:w-auto">
+            {submitting ? t(d.submitting) : t(d.submit)}
+          </Button>
+          <span className="text-sm text-muted">
+            {t(d.haveAccount)}{" "}
+            <Link href="/login" className="font-medium text-accent">
+              {t(dictionary.nav.login)}
+            </Link>
+          </span>
+        </div>
       </form>
     </PageShell>
   );
