@@ -88,12 +88,20 @@ export default function Header() {
               </button>
             </div>
           ) : (
-            <Link
-              href="/register"
-              className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-foreground/90"
-            >
-              {t(dictionary.nav.register)}
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/login"
+                className="hidden rounded-full border border-border px-3.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-white hover:text-foreground sm:inline-flex"
+              >
+                {t(dictionary.nav.login)}
+              </Link>
+              <Link
+                href="/register"
+                className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-foreground/90"
+              >
+                {t(dictionary.nav.register)}
+              </Link>
+            </div>
           )}
         </div>
       </div>
