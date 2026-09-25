@@ -1,0 +1,18 @@
+# data: public/synthetic only, never committed; never commit real patient data
+data/
+
+# backend runtime state
+backend/.venv/
+backend/keys/
+backend/storage/
+backend/*.db
+__pycache__/
+.pytest_cache/
+
+# frontend
+frontend/node_modules/
+frontend/.next/
+
+.DS_Store
+.env*
+medseal_check.png

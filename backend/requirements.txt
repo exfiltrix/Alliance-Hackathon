@@ -1,0 +1,13 @@
+# core: API, seal, verify
+fastapi>=0.115
+uvicorn[standard]>=0.30
+python-multipart>=0.0.9
+sqlalchemy>=2.0
+pydicom>=3.0
+numpy>=2.0
+cryptography>=43
+pillow>=11
+
+# tests
+pytest>=8
+httpx>=0.27
