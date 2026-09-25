@@ -46,42 +46,35 @@ function useSpeechReader(enabled: boolean) {
 
   useEffect(() => {
     if (!enabled || !speechSupported()) return;
-    let lastPointer = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let lastSpoken = "";
 
-    const textOf = (el: Element | null) => {
-      if (!el) return "";
-      const labelled = el.closest("[aria-label]")?.getAttribute("aria-label");
-      const node = el.closest("a, button, h1, h2, h3, p, li, label, td, th, [role=switch]") ?? el;
-      const text = (node as HTMLElement).innerText?.trim() || labelled || "";
-      return text.slice(0, 600);
-    };
-
-    const onPointerDown = () => {
-      lastPointer = Date.now();
-    };
-    const onClick = (e: MouseEvent) => {
-      const selection = window.getSelection()?.toString().trim();
-      speak(selection || textOf(e.target as Element), lang);
-    };
-    const onFocus = (e: FocusEvent) => {
-      if (Date.now() - lastPointer < 600) return;
-      speak(textOf(e.target as Element), lang);
+    // Wait until the user stops dragging the selection, then read it once.
+    const onSelectionChange = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const text = window.getSelection()?.toString().trim() ?? "";
+        if (!text) {
+          lastSpoken = "";
+          return;
+        }
+        if (text === lastSpoken) return;
+        lastSpoken = text;
+        speak(text, lang);
+      }, 500);
     };
 
-    document.addEventListener("pointerdown", onPointerDown, true);
-    document.addEventListener("click", onClick, true);
-    document.addEventListener("focusin", onFocus, true);
+    document.addEventListener("selectionchange", onSelectionChange);
     return () => {
-      document.removeEventListener("pointerdown", onPointerDown, true);
-      document.removeEventListener("click", onClick, true);
-      document.removeEventListener("focusin", onFocus, true);
+      clearTimeout(timer);
+      document.removeEventListener("selectionchange", onSelectionChange);
       stopSpeech();
     };
   }, [enabled, lang]);
 }
 
 export default function AccessibilityPanel() {
-  const { t, lang } = useLanguage();
+  const { t } = useLanguage();
   const settings = useA11y();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -118,11 +111,6 @@ export default function AccessibilityPanel() {
   const close = () => {
     setOpen(false);
     triggerRef.current?.focus();
-  };
-
-  const readPage = () => {
-    const main = document.getElementById("main");
-    if (main) speak(main.innerText, lang);
   };
 
   const optionClass = (active: boolean) =>
@@ -233,23 +221,18 @@ export default function AccessibilityPanel() {
                   }}
                 />
                 <p className="px-3 text-xs text-muted">{t(d.speechHint)}</p>
-                <div className="mt-3 flex gap-2 px-1">
-                  <button
-                    type="button"
-                    onClick={readPage}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-foreground px-3 py-2 text-sm font-medium text-white hover:bg-foreground/90"
-                  >
-                    <SpeakerIcon width={16} height={16} />
-                    {t(d.readPage)}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={stopSpeech}
-                    className="rounded-xl border border-border px-3 py-2 text-sm font-medium hover:bg-slate-100"
-                  >
-                    {t(d.stop)}
-                  </button>
-                </div>
+                {settings.speech && (
+                  <div className="mt-3 px-1">
+                    <button
+                      type="button"
+                      onClick={stopSpeech}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2 text-sm font-medium hover:bg-slate-100"
+                    >
+                      <SpeakerIcon width={16} height={16} />
+                      {t(d.stop)}
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
               <p className="px-3 text-xs text-muted">{t(d.speechUnsupported)}</p>
