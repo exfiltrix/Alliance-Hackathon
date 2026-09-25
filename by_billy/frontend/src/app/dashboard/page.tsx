@@ -39,7 +39,10 @@ export default function DashboardPage() {
         { label: t(d.tampered), value: stats.tampered, danger: true },
         { label: t(d.unsigned), value: stats.unsigned },
         { label: t(d.modelsTested), value: stats.models_tested },
-        { label: t(d.avgRobustness), value: `${stats.avg_robustness.toFixed(1)} / 10` },
+        {
+          label: t(d.avgRobustness),
+          value: stats.avg_robustness == null ? "—" : `${stats.avg_robustness.toFixed(1)} / 10`,
+        },
       ]
     : [];
 

@@ -31,9 +31,21 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
-    throw new ApiError(res.status, text || res.statusText);
+    throw new ApiError(res.status, detailOf(text) || res.statusText);
   }
   return res.json() as Promise<T>;
+}
+
+// FastAPI errors are {"detail": "message"} or, for validation, {"detail": [{"msg": ...}, ...]}.
+function detailOf(text: string): string {
+  try {
+    const { detail } = JSON.parse(text);
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) return detail.map((x) => x?.msg ?? String(x)).join("; ");
+  } catch {
+    // not JSON: show as is
+  }
+  return text;
 }
 
 const post = <T>(path: string, body: unknown) =>
@@ -80,7 +92,9 @@ const realApi = {
   createPassport: (modelId: number, crashTestId: number) =>
     post<Passport>("/passport", { model_id: modelId, crash_test_id: crashTestId }),
   getPassport: (id: number) => request<Passport>(`/passport/${id}`),
-  passportPdfUrl: (id: number) => backendUrl(`${API_BASE_URL}/passport/${id}/pdf`),
+  // The backend PDF exists in Uzbek and Russian; English UI gets the Uzbek PDF.
+  passportPdfUrl: (id: number, lang: "uz" | "ru" | "en") =>
+    backendUrl(`${API_BASE_URL}/passport/${id}/pdf?lang=${lang === "ru" ? "ru" : "uz"}`),
 
   getStats: () => request<Stats>("/stats"),
 };

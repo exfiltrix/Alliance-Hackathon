@@ -13,9 +13,11 @@ const d = dictionary.passport;
 
 const verdictStyle: Record<Verdict, string> = {
   allowed: "bg-ok/10 text-ok border-ok/30",
-  conditional: "bg-amber-50 text-amber-700 border-amber-300",
+  allowed_with_conditions: "bg-amber-50 text-amber-700 border-amber-300",
   not_allowed: "bg-danger/10 text-danger border-danger/30",
 };
+
+const pct = (v: number | null | undefined, digits = 0) => (v == null ? "—" : `${(v * 100).toFixed(digits)}%`);
 
 export default function PassportPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -45,7 +47,9 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
     </span>
   );
 
-  const pdfUrl = passport ? api.passportPdfUrl(passport.id) : "";
+  const pdfUrl = passport ? api.passportPdfUrl(passport.id, lang) : "";
+  const r = passport?.robustness;
+  const pipelineProtected = passport ? passport.pipeline.devices_active > 0 && passport.pipeline.ledger_ok : false;
 
   return (
     <PageShell title={t(d.title)} subtitle={t(d.subtitle)} icon={PassportIcon} step="passport" backHref="/crash-test">
@@ -57,7 +61,7 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
         </p>
       )}
 
-      {passport && (
+      {passport && r && (
         <div className="space-y-6">
           <Card className="space-y-6 print:border-0 print:p-0">
             <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-6">
@@ -72,11 +76,25 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
               </div>
             </div>
 
+            {passport.conditions.length > 0 && (
+              <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
+                <p className="font-semibold">{t(d.conditions)}</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  {passport.conditions.map((c) => (
+                    <li key={c}>{t(d.conditionTexts[c])}</li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs opacity-80">
+                  {t(d.rule).replaceAll("{allow}", String(passport.rules.allow_score))}
+                </p>
+              </div>
+            )}
+
             <div className="grid gap-6 sm:grid-cols-[200px_1fr]">
               <div>
                 <p className="text-xs text-muted">{t(d.robustness)}</p>
                 <p className="text-5xl font-semibold tracking-tight">
-                  {passport.robustness_score.toFixed(1)}
+                  {r.score.toFixed(1)}
                   <span className="text-xl text-muted"> / 10</span>
                 </p>
                 <p className="mt-2 text-xs text-muted">{t(dictionary.crash.scoreFormula)}</p>
@@ -85,10 +103,17 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
                 {passport.model.intended_use && (
                   <Field label={t(d.intendedUse)} value={passport.model.intended_use} />
                 )}
-                <Field label={t(d.organisation)} value={passport.organisation} />
-                <Field label={t(d.shieldCompatible)} value={yesNo(passport.shield_compatible)} />
-                <Field label={t(d.pipelineProtected)} value={yesNo(passport.pipeline_protected)} />
-                <Field label={t(d.crashTest)} value={passport.crash_test_id} />
+                {passport.organisation && <Field label={t(d.organisation)} value={passport.organisation} />}
+                <Field label={t(d.shieldCompatible)} value={yesNo(passport.shield.compatible)} />
+                {passport.shield.available && (
+                  <>
+                    <Field label={t(d.shieldDetection)} value={pct(passport.shield.detection_pgd_eps1)} />
+                    <Field label={t(d.shieldFalseAlarms)} value={pct(passport.shield.false_positive_rate, 1)} />
+                  </>
+                )}
+                <Field label={t(d.pipelineProtected)} value={yesNo(pipelineProtected)} />
+                <Field label={t(d.crashTest)} value={`${r.crash_test_id} · ${r.method.toUpperCase()}`} />
+                <Field label={t(d.testedOn)} value={r.n_images} />
                 <Field
                   label={t(d.date)}
                   value={new Date(passport.created_at).toLocaleDateString(localeOf(lang))}
@@ -96,11 +121,11 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
               </div>
             </div>
 
-            {Object.keys(passport.flip_rate).length > 0 && (
+            {Object.keys(r.flip_rate).length > 0 && (
               <div>
                 <p className="text-xs text-muted">{t(dictionary.crash.chartTitle)}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {Object.entries(passport.flip_rate)
+                  {Object.entries(r.flip_rate)
                     .sort(([a], [b]) => Number(a) - Number(b))
                     .map(([eps, v]) => (
                       <span key={eps} className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs">
@@ -108,13 +133,6 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
                       </span>
                     ))}
                 </div>
-              </div>
-            )}
-
-            {passport.conditions && (
-              <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800">
-                <p className="font-semibold">{t(d.conditions)}</p>
-                <p className="mt-1">{passport.conditions}</p>
               </div>
             )}
 

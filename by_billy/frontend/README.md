@@ -15,7 +15,7 @@ npm run dev          # http://localhost:3000
 
 Without `NEXT_PUBLIC_API_URL` the site runs on demo data (`src/lib/mock.ts`) and shows a "Demo" badge.
 
-Contract: `../docs/API.md`. The TypeScript types in `src/lib/types.ts` match it one-to-one; all requests go through `src/lib/api.ts`.
+Contract: `API.md` in the repo root (the backend follows it; `by_billy/docs/API.md` is an older copy). The TypeScript types in `src/lib/types.ts` match it one-to-one; all requests go through `src/lib/api.ts`.
 
 ## Where things are
 

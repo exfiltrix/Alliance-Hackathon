@@ -1,4 +1,4 @@
-// Shapes mirror by_billy/docs/API.md — keep both in sync.
+// Shapes mirror /API.md in the repo root (the backend contract) — keep both in sync.
 
 export type Device = {
   id: number;
@@ -19,14 +19,21 @@ export type SealResponse = {
 
 export type VerifyStatus = "authentic" | "tampered" | "unsigned" | "forged";
 
+export type ForgedReason = "ledger_entry_modified" | "bad_signature" | "device_revoked" | "unknown_device";
+
 export type VerifyResponse = {
   status: VerifyStatus;
-  uid?: string;
-  device?: string;
+  uid?: string | null;
+  device?: string | null;
+  seal_id?: number | null;
   changed_tiles: [number, number][];
+  tile?: number | null;
+  reason?: ForgedReason;
+  verify_ms?: number;
   preview_png: string;
-  detective?: { probability: number; heatmap_png: string };
-  shield: { attack_suspected: boolean; score: number; threshold: number };
+  // null when the AI is off on the backend; the detective key only exists for unsigned images
+  detective?: { probability: number; heatmap_png: string; experimental: boolean } | null;
+  shield: { attack_suspected: boolean; score: number; threshold: number } | null;
   note: string;
 };
 
@@ -48,11 +55,13 @@ export type CrashTestRequest = {
 };
 
 export type CrashTestJob = {
-  status: "running" | "done" | "error";
+  status: "queued" | "running" | "done" | "error";
   progress: number;
-  flip_rate: Record<string, number>;
-  psnr: Record<string, number>;
+  error?: string;
+  flip_rate?: Record<string, number>;
+  psnr?: Record<string, number>;
   example?: {
+    eps?: number;
     before_png: string;
     after_png: string;
     before_score: number;
@@ -61,27 +70,57 @@ export type CrashTestJob = {
   robustness_score?: number;
 };
 
-export type Verdict = "allowed" | "conditional" | "not_allowed";
+export type Verdict = "allowed" | "allowed_with_conditions" | "not_allowed";
+
+export type PassportCondition = "shield_required" | "seal_required" | "doctor_decides" | "retest_required";
 
 export type Passport = {
   id: number;
-  model: AiModel;
-  crash_test_id: number;
-  robustness_score: number;
-  flip_rate: Record<string, number>;
-  shield_compatible: boolean;
-  pipeline_protected: boolean;
-  verdict: Verdict;
-  conditions?: string;
-  organisation: string;
   created_at: string;
+  organisation: string;
+  model: AiModel;
+  robustness: {
+    score: number;
+    formula: string;
+    crash_test_id: number;
+    tested_at: string;
+    n_images: number;
+    method: AttackMethod;
+    pathology: string;
+    data: string[];
+    flip_rate: Record<string, number>;
+    psnr: Record<string, number>;
+    example?: CrashTestJob["example"] | null;
+  };
+  shield: {
+    available: boolean;
+    compatible: boolean;
+    method?: string;
+    threshold?: number;
+    false_positive_rate?: number;
+    detection_pgd_eps1?: number | null;
+    detection_fgsm_eps1?: number | null;
+  };
+  pipeline: {
+    devices_active: number;
+    seals: number;
+    verifications: number;
+    tampered_or_forged: number;
+    ledger_ok: boolean;
+  };
+  verdict: Verdict;
+  conditions: PassportCondition[];
+  rules: { allow_score: number; shield_min_detection: number; shield_max_false_alarms: number };
+  note: string;
 };
 
 export type Stats = {
   sealed: number;
   verified: number;
+  authentic: number;
   tampered: number;
   unsigned: number;
+  forged: number;
   models_tested: number;
-  avg_robustness: number;
+  avg_robustness: number | null; // null until a crash test has run
 };

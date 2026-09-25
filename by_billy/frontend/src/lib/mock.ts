@@ -25,6 +25,44 @@ const passports = new Map<number, Passport>();
 let nextId = 100;
 
 const FLIP = { "0.5": 0.12, "1": 0.48, "2": 0.9, "4": 1 };
+const PSNR = { "0.5": 58.3, "1": 52.1, "2": 46.2, "4": 40.1 };
+
+function mockPassport(id: number, model: AiModel, crashTestId: number): Passport {
+  const now = new Date().toISOString();
+  return {
+    id,
+    created_at: now,
+    organisation: "Namangan viloyat shifoxonasi",
+    model,
+    robustness: {
+      score: Math.round(10 * (1 - FLIP["1"]) * 10) / 10,
+      formula: "10 × (1 − flip rate at eps = 1 px)",
+      crash_test_id: crashTestId,
+      tested_at: now,
+      n_images: 50,
+      method: "pgd",
+      pathology: "Pneumonia",
+      data: ["nih/normal"],
+      flip_rate: FLIP,
+      psnr: PSNR,
+      example: null,
+    },
+    shield: {
+      available: true,
+      compatible: true,
+      method: "median 3x3, L1 distance of DenseNet logits",
+      threshold: 10.4,
+      false_positive_rate: 0.009,
+      detection_pgd_eps1: 1,
+      detection_fgsm_eps1: 0.62,
+    },
+    pipeline: { devices_active: 2, seals: 128, verifications: 342, tampered_or_forged: 7, ledger_ok: true },
+    verdict: "allowed_with_conditions",
+    conditions: ["shield_required", "seal_required", "doctor_decides"],
+    rules: { allow_score: 7, shield_min_detection: 0.9, shield_max_false_alarms: 0.02 },
+    note: "Final decision is made by the doctor.",
+  };
+}
 
 function canvas(w: number, h: number) {
   const c = document.createElement("canvas");
@@ -152,7 +190,7 @@ export const mockApi: Api = {
         status: "unsigned",
         changed_tiles: [],
         preview_png: await fileToPreview(file, []),
-        detective: { probability: 0.87, heatmap_png: heatmap() },
+        detective: { probability: 0.87, heatmap_png: heatmap(), experimental: false },
         shield,
         note,
       };
@@ -179,7 +217,7 @@ export const mockApi: Api = {
       status: done ? "done" : "running",
       progress,
       flip_rate: done ? FLIP : {},
-      psnr: done ? { "0.5": 58.3, "1": 52.1, "2": 46.2, "4": 40.1 } : {},
+      psnr: done ? PSNR : {},
     };
     if (done) {
       res.example = { before_png: fakeXray(), after_png: fakeXray(6), before_score: 0.08, after_score: 0.93 };
@@ -191,45 +229,20 @@ export const mockApi: Api = {
   async createPassport(modelId, crashTestId) {
     await wait(400);
     const id = nextId++;
-    const score = Math.round(10 * (1 - FLIP["1"]) * 10) / 10;
-    const p: Passport = {
-      id,
-      model: models.find((m) => m.id === modelId) ?? models[0],
-      crash_test_id: crashTestId,
-      robustness_score: score,
-      flip_rate: FLIP,
-      shield_compatible: true,
-      pipeline_protected: true,
-      verdict: "conditional",
-      conditions: "Faqat MedSeal Shield yoqilgan holda ishlatilsin.",
-      organisation: "Namangan viloyat shifoxonasi",
-      created_at: new Date().toISOString(),
-    };
+    const p = mockPassport(id, models.find((m) => m.id === modelId) ?? models[0], crashTestId);
     passports.set(id, p);
     return p;
   },
   async getPassport(id) {
     await wait(300);
-    return (
-      passports.get(id) ?? {
-        id,
-        model: models[0],
-        crash_test_id: 1,
-        robustness_score: 5.2,
-        flip_rate: FLIP,
-        shield_compatible: true,
-        pipeline_protected: true,
-        verdict: "conditional",
-        conditions: "Faqat MedSeal Shield yoqilgan holda ishlatilsin.",
-        organisation: "Namangan viloyat shifoxonasi",
-        created_at: new Date().toISOString(),
-      }
-    );
+    return passports.get(id) ?? mockPassport(id, models[0], 1);
   },
   passportPdfUrl: () => "",
 
   async getStats() {
     await wait(250);
-    return { sealed: 128, verified: 342, tampered: 7, unsigned: 41, models_tested: 3, avg_robustness: 5.8 };
+    return {
+      sealed: 128, verified: 342, authentic: 290, tampered: 7, unsigned: 41, forged: 4, models_tested: 3, avg_robustness: 5.8,
+    };
   },
 };

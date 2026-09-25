@@ -340,9 +340,30 @@ const dictionary = {
     detectiveTitle: { uz: "AI detektiv", ru: "AI-детектив", en: "AI detective" },
     detectiveLabel: { uz: "Soxtalik ehtimoli", ru: "Вероятность подделки", en: "Tampering probability" },
     detectiveNote: {
-      uz: "Bu ehtimollik, aniq xulosa emas. Issiqlik xaritasi shubhali joylarni ko'rsatadi.",
-      ru: "Это вероятность, а не точный вывод. Тепловая карта показывает подозрительные участки.",
-      en: "This is a probability, not a certain verdict. The heatmap shows suspicious areas.",
+      uz: "Bu ehtimollik, aniq xulosa emas. O'zgargan joyni aniq faqat muhr ko'rsatadi.",
+      ru: "Это вероятность, а не точный вывод. Точное место изменения показывает только печать.",
+      en: "This is a probability, not a certain verdict. Only the seal shows exactly where an image was changed.",
+    },
+    experimental: { uz: "Tajribaviy", ru: "Экспериментально", en: "Experimental" },
+    aiOff: {
+      uz: "AI moduli hozir o'chirilgan.",
+      ru: "AI-модуль сейчас выключен.",
+      en: "The AI module is currently off.",
+    },
+    warning: { uz: "Ogohlantirish", ru: "Предупреждение", en: "Warning" },
+    forgedReasons: {
+      ledger_entry_modified: {
+        uz: "Reyestrdagi yozuv o'zgartirilgan.",
+        ru: "Запись в реестре была изменена.",
+        en: "The ledger entry was modified.",
+      },
+      bad_signature: { uz: "Imzo mos kelmaydi.", ru: "Подпись не сходится.", en: "The signature does not match." },
+      device_revoked: {
+        uz: "Qurilma bekor qilingan.",
+        ru: "Устройство отозвано.",
+        en: "The device has been revoked.",
+      },
+      unknown_device: { uz: "Qurilma noma'lum.", ru: "Устройство неизвестно.", en: "Unknown device." },
     },
     heatmap: { uz: "Issiqlik xaritasi", ru: "Тепловая карта", en: "Heatmap" },
     shieldTitle: { uz: "AI qalqon", ru: "AI-щит", en: "AI shield" },
@@ -421,10 +442,48 @@ const dictionary = {
     verdict: { uz: "Xulosa", ru: "Вердикт", en: "Verdict" },
     verdicts: {
       allowed: { uz: "Ruxsat etiladi", ru: "Допускается", en: "Allowed" },
-      conditional: { uz: "Shartli ruxsat", ru: "Допускается с условиями", en: "Allowed with conditions" },
+      allowed_with_conditions: { uz: "Shartli ruxsat", ru: "Допускается с условиями", en: "Allowed with conditions" },
       not_allowed: { uz: "Ruxsat etilmaydi", ru: "Не допускается", en: "Not allowed" },
     },
     conditions: { uz: "Shartlar", ru: "Условия", en: "Conditions" },
+    conditionTexts: {
+      shield_required: {
+        uz: "Har bir surat modelga berilishidan oldin MedSeal qalqonidan o'tishi shart.",
+        ru: "Каждый снимок проходит AI-щит MedSeal до того, как попадёт в модель.",
+        en: "Every image passes the MedSeal shield before it reaches the model.",
+      },
+      seal_required: {
+        uz: "Suratlar olingan paytda muhrlanishi va modelga berilishidan oldin tekshirilishi shart.",
+        ru: "Снимки подписываются в момент съёмки и проверяются перед подачей в модель.",
+        en: "Images are sealed at capture and verified before they reach the model.",
+      },
+      doctor_decides: {
+        uz: "Model faqat maslahat beradi, yakuniy tashxisni shifokor qo'yadi.",
+        ru: "Модель только советует, окончательный диагноз ставит врач.",
+        en: "The model only advises; the doctor makes the diagnosis.",
+      },
+      retest_required: {
+        uz: "Modelni hujumlarga qarshi qayta o'qitib, sinov hujumidan qayta o'tkazish kerak.",
+        ru: "Переобучить модель с защитой от атак и пройти краш-тест повторно.",
+        en: "Retrain the model against attacks and run the crash test again.",
+      },
+    },
+    rule: {
+      uz: "Qoida: baho ≥ {allow} — ruxsat; baho < {allow} va qalqon mos — shartli ruxsat; aks holda — ruxsat yo'q.",
+      ru: "Правило: оценка ≥ {allow} — допускается; < {allow} и щит совместим — с условиями; иначе — не допускается.",
+      en: "Rule: score ≥ {allow} — allowed; < {allow} with a compatible shield — with conditions; otherwise not allowed.",
+    },
+    shieldDetection: {
+      uz: "Qalqon PGD hujumini aniqlaydi (eps = 1 px)",
+      ru: "Щит ловит атаку PGD (eps = 1 px)",
+      en: "Shield catches PGD attacks (eps = 1 px)",
+    },
+    shieldFalseAlarms: {
+      uz: "Toza suratlarda soxta signal",
+      ru: "Ложные тревоги на чистых снимках",
+      en: "False alarms on clean images",
+    },
+    testedOn: { uz: "Sinovdagi suratlar", ru: "Снимков в тесте", en: "Images tested" },
     organisation: { uz: "Mas'ul tashkilot", ru: "Ответственная организация", en: "Responsible organisation" },
     date: { uz: "Sana", ru: "Дата", en: "Date" },
     crashTest: { uz: "Sinov hujumi №", ru: "Краш-тест №", en: "Crash test No." },

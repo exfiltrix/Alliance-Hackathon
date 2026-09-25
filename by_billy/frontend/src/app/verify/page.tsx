@@ -82,6 +82,9 @@ export default function VerifyPage() {
               )}
             </div>
             <p className="mt-1 text-sm opacity-90">{t(d.status[result.status].desc)}</p>
+            {result.status === "forged" && result.reason && (
+              <p className="mt-1 text-sm font-medium">{t(d.forgedReasons[result.reason])}</p>
+            )}
           </div>
 
           <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
@@ -95,17 +98,8 @@ export default function VerifyPage() {
                     alt={`${t(d.preview)}: ${t(d.status[result.status].title)}`}
                     className="block max-h-[480px] w-auto max-w-full"
                   />
-                  {result.detective && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={pngSrc(result.detective.heatmap_png)}
-                      alt={t(d.heatmap)}
-                      className="pointer-events-none absolute inset-0 h-full w-full opacity-70 mix-blend-screen"
-                    />
-                  )}
                 </div>
               </div>
-              {result.detective && <p className="mt-2 text-xs text-muted">{t(d.heatmap)}</p>}
             </Card>
 
             <div className="space-y-4">
@@ -121,11 +115,18 @@ export default function VerifyPage() {
 
               {result.detective && (
                 <Card>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-semibold">{t(d.detectiveTitle)}</p>
-                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-                      {t(dictionary.common.probability)}
-                    </span>
+                    <div className="flex gap-1">
+                      {result.detective.experimental && (
+                        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+                          {t(d.experimental)}
+                        </span>
+                      )}
+                      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                        {t(dictionary.common.probability)}
+                      </span>
+                    </div>
                   </div>
                   <p className="mt-3 text-xs text-muted">{t(d.detectiveLabel)}</p>
                   <p className="text-3xl font-semibold">
@@ -139,28 +140,35 @@ export default function VerifyPage() {
               )}
 
               <Card
-                className={result.shield.attack_suspected ? "border-danger/40 bg-danger/5" : ""}
+                className={result.shield?.attack_suspected ? "border-danger/40 bg-danger/5" : ""}
               >
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold">{t(d.shieldTitle)}</p>
+                  {/* the shield score is a distance, not a percentage: show it as a warning */}
                   <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
-                    {t(dictionary.common.probability)}
+                    {t(d.warning)}
                   </span>
                 </div>
-                <p
-                  className={`mt-3 font-semibold ${
-                    result.shield.attack_suspected ? "text-danger" : "text-ok"
-                  }`}
-                >
-                  {result.shield.attack_suspected ? t(d.shieldFlag) : t(d.shieldClean)}
-                </p>
-                {result.shield.attack_suspected && (
-                  <p className="mt-1 text-xs text-danger/80">{t(d.shieldFlagNote)}</p>
+                {result.shield ? (
+                  <>
+                    <p
+                      className={`mt-3 font-semibold ${
+                        result.shield.attack_suspected ? "text-danger" : "text-ok"
+                      }`}
+                    >
+                      {result.shield.attack_suspected ? t(d.shieldFlag) : t(d.shieldClean)}
+                    </p>
+                    {result.shield.attack_suspected && (
+                      <p className="mt-1 text-xs text-danger/80">{t(d.shieldFlagNote)}</p>
+                    )}
+                    <p className="mt-2 text-xs text-muted">
+                      {t(d.shieldScore)}: {result.shield.score.toFixed(2)} ({t(d.threshold)}{" "}
+                      {result.shield.threshold.toFixed(2)})
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-3 text-sm text-muted">{t(d.aiOff)}</p>
                 )}
-                <p className="mt-2 text-xs text-muted">
-                  {t(d.shieldScore)}: {result.shield.score.toFixed(2)} ({t(d.threshold)}{" "}
-                  {result.shield.threshold.toFixed(2)})
-                </p>
               </Card>
 
               <DoctorNote />

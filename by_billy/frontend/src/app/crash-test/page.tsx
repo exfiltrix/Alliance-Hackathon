@@ -79,7 +79,11 @@ export default function CrashTestPage() {
       .getCrashTest(id)
       .then((res) => {
         setJob(res);
-        if (res.status === "running") timer.current = setTimeout(() => poll(id), 1000);
+        if (res.status === "queued" || res.status === "running") timer.current = setTimeout(() => poll(id), 1000);
+        if (res.status === "error") {
+          setJob(null);
+          setError(res.error ?? t(dictionary.common.error));
+        }
       })
       .catch((e) => setError(errorMessage(e)));
   };
@@ -110,7 +114,7 @@ export default function CrashTestPage() {
     }
   };
 
-  const running = job?.status === "running";
+  const running = job?.status === "queued" || job?.status === "running";
   const done = job?.status === "done";
 
   return (
@@ -214,7 +218,7 @@ export default function CrashTestPage() {
             <Card>
               <p className="text-sm font-semibold">{t(d.chartTitle)}</p>
               <p className="mb-6 text-xs text-muted">{t(d.chartAxis)}</p>
-              <FlipRateChart flipRate={job.flip_rate} psnr={job.psnr} psnrLabel={t(d.psnr)} caption={t(d.chartTitle)} epsLabel={t(d.attackStrength)} />
+              <FlipRateChart flipRate={job.flip_rate ?? {}} psnr={job.psnr ?? {}} psnrLabel={t(d.psnr)} caption={t(d.chartTitle)} epsLabel={t(d.attackStrength)} />
             </Card>
 
             <Card className="flex flex-col">

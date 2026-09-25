@@ -13,9 +13,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Текущее состояние репозитория
 
 - Работа поделена: backend ведёт владелец репозитория, frontend — второй разработчик. Контракт между ними — `API.md`; любое изменение ответа API сразу отражать там.
-- Backend готов: устройства, печать, проверка, реестр с hash-chain, `/stats`, краш-тест, щит, паспорт + PDF. `app/ai/hooks.py` — точка подключения ИИ к `/verify`: щит подключён, детектив пока заглушка (`None` → `null`).
+- Backend готов: устройства, печать, проверка, реестр с hash-chain, `/stats`, краш-тест, щит, паспорт + PDF. `app/ai/hooks.py` — точка подключения ИИ к `/verify`: щит и детектив подключены (детектив возвращает `null`, пока нет весов `backend/weights/detective.pt` — они в .gitignore, обучение: `python -m scripts.train_detective`, ~20 мин).
 - Паспорт (`app/passport/`) не зависит от torch: читает строку краш-теста и `shield_calibration.json`. Вердикт — детерминированные правила в `report.decide()` (оценка ≥ 7 → разрешено; < 7 и щит совместим → с условиями; иначе нет). Паспорт замораживается при выдаче (`report_json`). PDF — fpdf2 + DejaVu Sans из `app/passport/fonts/` (кириллица и узбекская латиница); тексты PDF в `app/passport/i18n.py`.
-- `frontend/` ещё не создан.
+- Frontend лежит в `by_billy/frontend/` (Next.js 16, второй разработчик), а не в `frontend/`. Подключён к реальному API: типы в `src/lib/types.ts` сверены с корневым `API.md` (`by_billy/docs/API.md` — устаревшая копия). Без `NEXT_PUBLIC_API_URL` в `.env.local` работает на демо-данных `src/lib/mock.ts` — при смене типов обновлять и моки, иначе `npm run build` упадёт. Все строки UI — `src/lib/dictionary.ts` (uz/ru/en).
+- Тепловая карта детектива во фронтенде не показывается: она построена по центральному квадрату 224×224 и на тестах попадает на подделку лишь в 4,8% случаев.
 - Документы лежат **в корне** (`SPEC.md`, `ARCHITECTURE.md`, `API.md`, `TASKS.md`, `DEMO.md`), хотя в них упоминается путь `docs/…`.
 - `reference/medseal_poc.py` извлечён из `muhr.zip`; остальное содержимое архива дублирует файлы в корне.
 
@@ -81,8 +82,9 @@ cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 # MEDSEAL_AI=0 выключает щит/детектива в /verify (в тестах выключены по умолчанию, ИИ-тесты включают сами)
 # скрипты запускать из backend/ через -m (им нужен пакет app)
 
-# frontend
-cd frontend && npm install && npm run dev   # http://localhost:3000
+# frontend (by_billy/frontend)
+cd by_billy/frontend && npm install && cp .env.example .env.local && npm run dev   # http://localhost:3000
+npm run build && npm run lint                       # проверка типов и линтер
 
 # эталонный PoC (печатает сценарии 0/A/B/C и тайминги, сохраняет medseal_check.png)
 python reference/medseal_poc.py
