@@ -4,4 +4,5 @@
 torch>=2.5
 torchvision>=0.20
 torchxrayvision>=1.3
+opencv-python-headless>=4.10  # detective: forgeries, Grad-CAM overlay
 pyarrow  # scripts/fetch_dataset.py

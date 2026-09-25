@@ -29,6 +29,9 @@ class Settings:
     ai_enabled: bool = os.environ.get("MEDSEAL_AI", "1") != "0"
     # Shield threshold + measured quality (scripts/calibrate_shield.py). Committed; the passport reads it too.
     shield_calibration: Path = BACKEND_DIR / "app" / "ai" / "shield_calibration.json"
+    # Detective weights (scripts/train_detective.py) and their held-out quality.
+    detective_weights: Path = _path("MEDSEAL_DETECTIVE_WEIGHTS", BACKEND_DIR / "weights" / "detective.pt")
+    detective_metrics: Path = BACKEND_DIR / "app" / "ai" / "detective_metrics.json"
 
 
 settings = Settings()

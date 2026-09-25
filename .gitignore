@@ -6,6 +6,7 @@ backend/.venv/
 backend/keys/
 backend/storage/
 backend/*.db
+backend/weights/
 __pycache__/
 .pytest_cache/
 

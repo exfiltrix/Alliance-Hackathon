@@ -68,6 +68,11 @@ def to_uint8(x: torch.Tensor) -> np.ndarray:
     return np.clip(np.round(img), 0, 255).astype(np.uint8)
 
 
+def model_input(px: np.ndarray) -> np.ndarray:
+    """Any grayscale image -> the 224x224 8-bit picture the model sees (attacks and fakes live at this scale)."""
+    return to_uint8(preprocess(px))
+
+
 def scores(x: torch.Tensor) -> torch.Tensor:
     """[N, 1, 224, 224] -> [N, n_pathologies] calibrated scores (threshold 0.5). Differentiable."""
     return load_model()(x)

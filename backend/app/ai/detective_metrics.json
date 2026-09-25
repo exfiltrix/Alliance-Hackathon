@@ -1,0 +1,29 @@
+{
+  "model": "ResNet18 (ImageNet init), 1 channel, 224x224",
+  "trained_on": "NIH ChestX-ray14 (CC0), 2000 images + synthetic forgeries",
+  "forgery_kinds": [
+    "nodule",
+    "splice",
+    "copy_move",
+    "removal"
+  ],
+  "epochs": 6,
+  "test": {
+    "images": 500,
+    "forgeries": 500,
+    "auc": 0.942,
+    "accuracy": 0.881,
+    "false_alarms_on_real": 0.084,
+    "recall_by_kind": {
+      "nodule": 0.8,
+      "splice": 0.784,
+      "copy_move": 0.8,
+      "removal": 1.0
+    },
+    "heatmap_hits_edit": 0.048
+  },
+  "out_of_domain": {
+    "kermany_paediatric_false_alarms": 0.545
+  },
+  "created_at": "2026-09-25T07:22:50Z"
+}

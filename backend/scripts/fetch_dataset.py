@@ -63,8 +63,8 @@ def fetch_kermany() -> None:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--nih-normal", type=int, default=600)
-    ap.add_argument("--nih-findings", type=int, default=300)
+    ap.add_argument("--nih-normal", type=int, default=5000, help="max images (the file has 1419)")
+    ap.add_argument("--nih-findings", type=int, default=5000, help="max images (the file has 1081)")
     args = ap.parse_args()
     fetch_nih(args.nih_normal, args.nih_findings)
     fetch_kermany()

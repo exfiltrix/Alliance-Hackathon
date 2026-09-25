@@ -25,7 +25,7 @@ BATCH = 8
 
 
 def load_inputs(paths) -> list[np.ndarray]:
-    return [shield.model_input(load_image(p.read_bytes()).px) for p in paths]
+    return [model.model_input(load_image(p.read_bytes()).px) for p in paths]
 
 
 def batched_distances(imgs: list[np.ndarray]) -> np.ndarray:

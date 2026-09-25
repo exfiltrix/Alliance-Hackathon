@@ -35,17 +35,12 @@ def distances(imgs: list[np.ndarray]) -> np.ndarray:
     return (logits[0::2] - logits[1::2]).abs().sum(dim=1).numpy()
 
 
-def model_input(px: np.ndarray) -> np.ndarray:
-    """Any grayscale image -> the 224x224 8-bit picture the model sees (the attack lives at this scale)."""
-    return model.to_uint8(model.preprocess(px))
-
-
 @lru_cache(maxsize=1)
 def calibration() -> dict:
     return json.loads(settings.shield_calibration.read_text())
 
 
 def check(px: np.ndarray) -> dict:
-    score = float(distances([model_input(px)])[0])
+    score = float(distances([model.model_input(px)])[0])
     threshold = calibration()["threshold"]
     return {"attack_suspected": score > threshold, "score": round(score, 3), "threshold": threshold}

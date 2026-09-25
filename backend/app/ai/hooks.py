@@ -1,9 +1,9 @@
 """Entry points the verify flow uses to call the AI modules.
 
 Both return None while the module is not available (torch not installed, shield not
-calibrated, MEDSEAL_AI=0), and the API then returns `null` for that block.
+calibrated / detective not trained, MEDSEAL_AI=0), and the API then returns `null` for that block.
 
-run_detective -> {"probability": float 0..1, "heatmap_png": base64 str}
+run_detective -> {"probability": float 0..1, "heatmap_png": base64 str, "experimental": bool}
 run_shield    -> {"attack_suspected": bool, "score": float, "threshold": float}
 """
 import logging
@@ -16,7 +16,20 @@ log = logging.getLogger(__name__)
 
 
 def run_detective(px: np.ndarray) -> dict | None:
-    return None
+    if not settings.ai_enabled:
+        return None
+    try:
+        from app.ai import detective
+    except ImportError:
+        return None
+    if not settings.detective_weights.exists() or not settings.detective_metrics.exists():
+        log.warning("detective is not trained: run python -m scripts.train_detective")
+        return None
+    try:
+        return detective.check(px)
+    except Exception:  # the seal verdict must not be lost because the AI block failed
+        log.exception("detective failed")
+        return None
 
 
 def run_shield(px: np.ndarray) -> dict | None:

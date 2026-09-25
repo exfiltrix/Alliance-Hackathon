@@ -40,14 +40,15 @@ Device: `{id, name, hospital, public_key_hex, revoked, created_at}`
   "changed_tiles": [[64,16],[64,32]], "tile": 32,
   "verify_ms": 1.1,
   "preview_png": "base64…",
-  "detective": { "probability": 0.87, "heatmap_png": "base64…" },
+  "detective": { "probability": 0.87, "heatmap_png": "base64…", "experimental": false },
   "shield": { "attack_suspected": false, "score": 3.64, "threshold": 10.42 },
   "note": "Final decision is made by the doctor." }
 ```
 - `changed_tiles`: `[y, x]` of the top-left corner of each changed tile, in original image pixels; tile size is `tile`. `preview_png` already has red boxes drawn on them (preview is scaled down to max 1024 px).
 - `unsigned`: `uid`, `device`, `seal_id`, `tile` are `null`.
 - `forged`: extra field `reason` = `ledger_entry_modified | bad_signature | device_revoked | unknown_device`; `changed_tiles` is empty (tiles are not compared against an untrusted record).
-- `detective` key is present only when `status == "unsigned"`. `detective` is still `null` (not connected yet); `shield` is `null` when the AI is off (`MEDSEAL_AI=0`, torch not installed) — the UI must handle `null` for both.
+- `detective` key is present only when `status == "unsigned"` (a sealed image is checked by the seal, exactly). `detective` / `shield` are `null` when the AI is off (`MEDSEAL_AI=0`, torch not installed, detective not trained) — the UI must handle `null` for both.
+- `detective.probability` = chance the image was edited (0..1). `heatmap_png` is a 448×448 RGB PNG of the 224×224 picture the model sees (centre square crop of the image), with a Grad-CAM heatmap where the detective looked; show it next to the preview, not over it. `experimental: true` → add an "experimental" badge (the detective scored below AUC 0.9 on held-out images). ~50 ms; the first call after startup ~1 s.
 - `shield` runs on every status, including `authentic`: the seal proves where the image came from, the shield checks whether its pixels carry an adversarial attack (an attacked image can be sealed too).
 - `shield.score` is a distance, not a percentage (clean X-rays ≈ 3–8, attacked ≈ 10–100+); `attack_suspected = score > threshold`. Show it as "Yashirin hujum aniqlandi" / "Shubhali shovqin topilmadi" plus `score / threshold`, not as "87%". About 1% of clean images raise a false alarm, so it is a warning, not a verdict. Takes ~50 ms (first call after startup ~2 s: model load).
 - UI labels: `authentic`/`tampered`/`forged` are certain ("Tasdiqlangan"); `detective` is a probability ("Ehtimollik 87%"), `shield` is a warning (see above).
