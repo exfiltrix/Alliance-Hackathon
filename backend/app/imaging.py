@@ -2,7 +2,9 @@
 
 Patient tags are stripped from DICOM right after parsing, before anything is stored.
 """
+import hashlib
 import io
+import json
 import uuid
 from dataclasses import dataclass
 from typing import Literal
@@ -14,6 +16,17 @@ from pydicom.uid import generate_uid
 
 PNG_UID_KEY = "medseal_uid"
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+
+# Display-affecting DICOM tags that never touch pixel data but change what the doctor sees
+# (P0-5): RescaleSlope/Intercept shift HU values, Laterality swaps left/right, WindowCenter/
+# Width changes contrast, PixelSpacing changes measured size. These get their own hash bound
+# into the seal signature, since the pixel-tile hashes alone cannot cover them.
+META_TAGS = (
+    "Modality", "BodyPartExamined", "Laterality", "ImageLaterality", "ViewPosition",
+    "PhotometricInterpretation", "BitsStored", "PixelRepresentation",
+    "RescaleSlope", "RescaleIntercept", "RescaleType", "WindowCenter", "WindowWidth",
+    "PixelSpacing", "StudyInstanceUID", "SeriesInstanceUID",
+)
 
 # Tags that identify the patient. Removing them does not touch pixel data.
 PATIENT_TAGS = (
@@ -94,6 +107,23 @@ def native_pixels(img: Image.Image) -> np.ndarray:
     elif img.mode not in _NATIVE_MODES:
         img = img.convert("RGB")
     return np.array(img)
+
+
+def meta_fields(image: "LoadedImage") -> dict:
+    """Values of META_TAGS present in the dataset (DICOM), or the PNG's channel mode."""
+    if image.kind == "dicom":
+        out = {}
+        for tag in META_TAGS:
+            if tag in image.dataset:
+                v = image.dataset[tag].value
+                out[tag] = str(v) if not isinstance(v, (int, float, str)) else v
+        return out
+    return {"mode": image.pil.mode}
+
+
+def meta_hash(fields: dict) -> bytes:
+    canonical = json.dumps(fields, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(canonical).digest()
 
 
 def to_grayscale(px: np.ndarray) -> np.ndarray:

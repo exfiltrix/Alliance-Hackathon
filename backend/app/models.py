@@ -45,6 +45,8 @@ class Seal(Base):
     tile: Mapped[int] = mapped_column(Integer)
     leaves_json: Mapped[str] = mapped_column(Text)  # JSON [[y, x, sha256_hex], ...] sorted by (y, x)
     root_hex: Mapped[str] = mapped_column(String(64))
+    meta_hash_hex: Mapped[str] = mapped_column(String(64), default="")  # sha256 of imaging.meta_fields; see P0-5
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")  # the fields themselves, for changed_meta on verify
     sig_hex: Mapped[str] = mapped_column(String(128))
     prev_hash: Mapped[str] = mapped_column(String(64), unique=True)  # unique => the chain cannot fork
     entry_hash: Mapped[str] = mapped_column(String(64), unique=True)

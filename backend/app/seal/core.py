@@ -45,18 +45,26 @@ def merkle_root(leaves: Leaves) -> bytes:
     return level[0]
 
 
-def seal(px: np.ndarray, uid: str, key: Ed25519PrivateKey, tile: int | None = None) -> dict:
-    """Gateway side: fingerprint tiles, build Merkle root, sign it."""
+def seal(
+    px: np.ndarray, uid: str, key: Ed25519PrivateKey, tile: int | None = None, meta_hash: bytes = b""
+) -> dict:
+    """Gateway side: fingerprint tiles, build Merkle root, sign it.
+
+    meta_hash (P0-5) binds display-affecting metadata (see imaging.meta_fields) into the
+    signature, so it can't be edited independently of the pixels. Default b"" keeps the message
+    format identical to before for callers that don't care about metadata (e.g. unit tests).
+    """
     tile = tile or tile_size_for(px.shape)
     leaves = tile_hashes(px, uid, tile)
     root = merkle_root(leaves)
-    return {"uid": uid, "tile": tile, "leaves": leaves, "root": root, "sig": key.sign(root + uid.encode())}
+    sig = key.sign(root + meta_hash + uid.encode())
+    return {"uid": uid, "tile": tile, "leaves": leaves, "root": root, "meta_hash": meta_hash, "sig": sig}
 
 
 def check_record(record: dict, pub: Ed25519PublicKey) -> bool:
     """The ledger record is authentic: valid signature and the stored leaves produce the stored root."""
     try:
-        pub.verify(record["sig"], record["root"] + record["uid"].encode())
+        pub.verify(record["sig"], record["root"] + record.get("meta_hash", b"") + record["uid"].encode())
     except InvalidSignature:
         return False
     return merkle_root(record["leaves"]) == record["root"]

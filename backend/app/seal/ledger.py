@@ -22,6 +22,8 @@ def record_bytes(row: Seal) -> bytes:
             "tile": row.tile,
             "leaves": row.leaves_json,
             "root": row.root_hex,
+            "meta_hash": row.meta_hash_hex,
+            "meta": row.meta_json,
             "sig": row.sig_hex,
         },
         sort_keys=True,
@@ -73,5 +75,6 @@ def to_record(row: Seal) -> dict:
         "tile": row.tile,
         "leaves": {(y, x): bytes.fromhex(h) for y, x, h in json.loads(row.leaves_json)},
         "root": bytes.fromhex(row.root_hex),
+        "meta_hash": bytes.fromhex(row.meta_hash_hex) if row.meta_hash_hex else b"",
         "sig": bytes.fromhex(row.sig_hex),
     }

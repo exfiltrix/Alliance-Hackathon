@@ -443,7 +443,13 @@ const dictionary = {
         en: "The device has been revoked.",
       },
       unknown_device: { uz: "Qurilma noma'lum.", ru: "Устройство неизвестно.", en: "Unknown device." },
+      metadata_changed: {
+        uz: "Tibbiy metama'lumotlar o'zgartirilgan (masalan, HU shkalasi yoki tomon).",
+        ru: "Изменены медицинские метаданные (например, шкала HU или сторона снимка).",
+        en: "Medical metadata was changed (e.g. the HU scale or image laterality).",
+      },
     },
+    metadataChanged: { uz: "O'zgargan maydonlar", ru: "Изменённые поля", en: "Changed fields" },
     warnings: {
       device_revoked_later: {
         uz: "Bu surat muhrlangandan keyin qurilma bekor qilingan. Muhr hali ham haqiqiy, lekin qurilmaga endi ishonib bo'lmaydi.",

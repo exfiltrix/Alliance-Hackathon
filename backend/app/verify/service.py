@@ -10,7 +10,7 @@ import time
 from sqlalchemy.orm import Session
 
 from app.ai import hooks
-from app.imaging import LoadedImage, to_grayscale
+from app.imaging import LoadedImage, meta_fields, meta_hash, to_grayscale
 from app.models import Device, Verification
 from app.seal import core, keys, ledger
 from app.verify.preview import render_preview
@@ -52,7 +52,23 @@ def verify_upload(session: Session, image: LoadedImage) -> dict:
             result.update(status="forged", reason=reason)
         else:
             changed = core.changed_tiles(image.px, ledger.to_record(row))
-            result.update(status="tampered" if changed else "authentic", changed_tiles=[list(k) for k in changed])
+            # P0-5: RescaleIntercept, Laterality, WindowCenter etc. never touch pixel data, so
+            # they need their own comparison — changed_tiles alone cannot see them.
+            meta_changed, changed_meta = False, []
+            if row.meta_hash_hex:
+                current_meta = meta_fields(image)
+                if meta_hash(current_meta).hex() != row.meta_hash_hex:
+                    meta_changed = True
+                    stored_meta = json.loads(row.meta_json or "{}")
+                    changed_meta = sorted(
+                        k for k in set(stored_meta) | set(current_meta) if stored_meta.get(k) != current_meta.get(k)
+                    )
+            result.update(
+                status="tampered" if (changed or meta_changed) else "authentic",
+                changed_tiles=[list(k) for k in changed],
+            )
+            if meta_changed:
+                result.update(reason="metadata_changed", changed_meta=changed_meta)
             if warning:
                 result["warning"] = warning
     result["verify_ms"] = round((time.perf_counter() - t0) * 1000, 2)

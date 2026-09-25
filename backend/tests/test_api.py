@@ -129,6 +129,22 @@ def test_dicom_seal_strips_patient_tags(client, device, ct_path):
     assert result["status"] == "tampered" and result["changed_tiles"] == [[32, 16]]
 
 
+def test_dicom_rescale_intercept_change_is_detected(client, device, ct_path):
+    """P0-5: RescaleIntercept shifts every displayed HU value without touching a single pixel."""
+    raw = open(ct_path, "rb").read()
+    _, sealed = seal(client, device, raw, "ct.dcm")
+
+    ds = pydicom.dcmread(io.BytesIO(sealed))
+    ds.RescaleIntercept = float(getattr(ds, "RescaleIntercept", 0)) + 1000
+    buf = io.BytesIO()
+    ds.save_as(buf, enforce_file_format=True)
+
+    result = verify(client, buf.getvalue(), "ct.dcm")
+    assert result["status"] == "tampered"
+    assert result["reason"] == "metadata_changed"
+    assert "RescaleIntercept" in result["changed_meta"]
+
+
 def test_reseal_same_image_is_idempotent(client, device):
     first, sealed = seal(client, device, xray_png())
     again, _ = seal(client, device, sealed)
