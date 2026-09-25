@@ -34,6 +34,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: by_billy/frontend/package-lock.json }
       - run: npm ci
+      - run: npx next typegen  # route/layout types (LayoutProps...) that next dev/build normally generate
       - run: npx tsc --noEmit -p .
       - run: npm run lint
       - run: npm run build  # demo-data mode (no NEXT_PUBLIC_API_URL): catches mocks out of sync with types
