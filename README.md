@@ -86,6 +86,15 @@ Works offline: the blockchain runs locally (Hardhat). For a public testnet (Sepo
 
 Tests: `cd backend && .venv/bin/pytest` · `cd contracts && npx hardhat test` · frontend `npx tsc --noEmit && npm run lint`. They also run on every commit (`git config core.hooksPath .githooks`) and on GitHub Actions.
 
+## Team
+
+| Name | Role |
+|---|---|
+| Мирмахмудов Фаррух | Backend developer |
+| Нормирзаев Билолиддин | Frontend developer |
+| Акрамов Дониёр | Designer |
+| Саидазимов Эмир-Саид | Analyst |
+
 ## Repository
 
 ```
