@@ -70,6 +70,13 @@ cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/pytest tests/test_seal_core.py::test_one_pixel_change   # один тест
 # пути БД/ключей/хранилища переопределяются через MEDSEAL_DB_URL, MEDSEAL_KEYS_DIR, MEDSEAL_STORAGE_DIR
 
+# AI (torch CPU; работает на 3.14). Веса DenseNet кешируются в ~/.torchxrayvision
+.venv/bin/pip install -r requirements-ai.txt --extra-index-url https://download.pytorch.org/whl/cpu
+.venv/bin/python -m scripts.fetch_samples          # публичные рентгены в data/samples + веса (нужен интернет один раз)
+.venv/bin/python -m scripts.attack_demo ../data/samples/00000001_000.png --eps 1 --method pgd   # до/после в data/demo
+.venv/bin/pytest -m "not ai"                        # быстрые тесты без модели; ИИ-тесты сами пропускаются без весов/снимков
+# скрипты запускать из backend/ через -m (им нужен пакет app)
+
 # frontend
 cd frontend && npm install && npm run dev   # http://localhost:3000
 
@@ -92,7 +99,8 @@ python reference/medseal_poc.py
 
 **ИИ-модули:**
 
-- Модель: `xrv.models.DenseNet(weights="densenet121-res224-all")`, вход `[1,1,224,224]`, нормализация `xrv.datasets.normalize(img, 255)` (диапазон ≈ [-1024, 1024]). Для демо — класс «Pneumonia».
+- Модель: `xrv.models.DenseNet(weights="densenet121-res224-all")`, вход `[1,1,224,224]`, нормализация как `xrv.datasets.normalize(img, 255)` (диапазон [-1024, 1024]; сама функция принимает только numpy, в `app/ai/model.py` формула на тензоре). Для демо — класс «Pneumonia». Выходы откалиброваны `op_threshs`, поэтому порог «болен» = 0.5 для всех патологий.
+- Атака сама выбирает направление: здоровый снимок толкает вверх через 0.5, больной — вниз.
 - eps в атаках задаётся в пикселях 0–255 (`[0.5, 1, 2, 4]`) и умножается на `2048/255` для нормализованного пространства. PGD = 10 шагов с шагом `eps/4` и проекцией на eps-шар.
 - Оценка устойчивости: `round(10 × (1 − flip_rate при eps=1), 1)` — формулу нужно объяснять в паспорте.
 - Щит: `d = max |score(orig) − score(squeezed)|` по патологиям для медианы 3×3 и 5-битной глубины; порог = 95-й перцентиль `d` на чистых снимках, калибруется один раз и сохраняется в конфиг.
