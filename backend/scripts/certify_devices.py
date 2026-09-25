@@ -18,7 +18,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Certify existing MedSeal devices")
     parser.add_argument("--authorization", default="", help="Bearer authorization value; defaults to MEDSEAL_ADMIN_TOKEN")
     args = parser.parse_args()
-    supplied = args.authorization.removeprefix("Bearer ").strip()
+    # --help promises this; without it the script refused every run where MEDSEAL_ADMIN_TOKEN
+    # was exported, which is exactly the documented migration command in CLAUDE.md/README.md.
+    supplied = args.authorization.removeprefix("Bearer ").strip() or settings.admin_token
     if not settings.admin_token or not hmac.compare_digest(supplied.encode(), settings.admin_token.encode()):
         raise SystemExit("Admin authorization is required; set MEDSEAL_ADMIN_TOKEN or pass --authorization")
 

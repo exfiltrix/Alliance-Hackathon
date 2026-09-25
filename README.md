@@ -67,8 +67,19 @@ cd by_billy/frontend
 npm install
 cp .env.example .env.local   # fill in MEDSEAL_DEVICE_TOKEN (from create_demo_device above),
                               # MEDSEAL_ADMIN_TOKEN, MEDSEAL_GATEWAY_USER/PASSWORD
-npm run dev                  # http://localhost:3000
+npm run dev                  # http://localhost:3000  (development)
 ```
+
+For the demo (and for `scripts/e2e_live.sh`) run the production build instead:
+
+```bash
+cd by_billy/frontend
+npm run build && npm run start   # http://localhost:3000
+```
+
+`npm run start` listens on all interfaces, so a phone on the same Wi-Fi can open
+`http://<your-lan-ip>:3000` (`ipconfig getifaddr en0`). The backend must allow that origin:
+`MEDSEAL_CORS_ORIGIN_REGEX` already covers private `10./172.16-31./192.168.` addresses on port 3000.
 
 Without a `MEDSEAL_GATEWAY_USER`/`PASSWORD`, the `/seal` page and its gateway API routes refuse
 every request with `503` (fail closed, P1-01) rather than opening up. Without
@@ -81,9 +92,30 @@ every request with `503` (fail closed, P1-01) rather than opening up. Without
 2. `scripts.create_demo_device` — issues a device certified by that root key; prints a device
    token (shown once — copy it into the frontend's `.env.local`).
 3. Set `MEDSEAL_ADMIN_TOKEN` (backend) and the matching frontend gateway/admin env vars.
-4. Optional AI stack: `pip install -r requirements-ai.txt`, then `scripts.fetch_samples`,
-   `scripts.calibrate_shield`, `scripts.train_detective` as needed (see root `CLAUDE.md` for the
-   full command list and what each one needs).
+4. `scripts.certify_devices` — only needed for a database created **before** device certificates
+   existed (CRY-02): with `MEDSEAL_REQUIRE_DEVICE_CERT=1` (the default) an uncertified device makes
+   its seals verify as `forged` / `untrusted_device`. Idempotent; prints
+   `certified devices: 0` when everything is already certified, which is exactly what a fresh
+   `create_demo_device` setup reports. Requires `MEDSEAL_ADMIN_TOKEN` in the environment.
+5. Optional AI stack: see below.
+
+### AI stack (shield, crash test, detective)
+
+```bash
+cd backend
+.venv/bin/pip install -r requirements-ai.txt --extra-index-url https://download.pytorch.org/whl/cpu
+.venv/bin/python -m scripts.fetch_samples    # data/samples: 2 X-rays + 1 DICOM + 1 JPG (~1 MB)
+.venv/bin/python -m scripts.fetch_dataset    # data/nih + data/xray, ~231 MB, needed by the two below
+```
+
+`scripts.fetch_dataset` is a prerequisite, not an optional extra: `scripts.calibrate_shield` and
+`scripts.train_detective` both read `data/nih` and exit with `No images in data/nih` without it.
+`scripts.train_detective` takes roughly 20 minutes on a laptop CPU and writes
+`weights/detective.pt` (gitignored) plus `app/ai/detective_metrics.json` (committed).
+
+`scripts.calibrate_shield` and `scripts.train_detective` are only needed to **re-measure**: the
+shield threshold and the detective's measured quality already ship with the repository, so a
+normal demo run needs neither.
 
 ### Env vars
 
@@ -133,3 +165,34 @@ cd by_billy/frontend
 npm run lint
 npm run build
 ```
+
+## Live end-to-end check (HYG-05)
+
+`scripts/demo_smoke.py` runs the whole pipeline in-process against a throwaway database.
+`scripts/e2e_live.sh` proves the same thing over real HTTP against the two running servers, which
+is what catches configuration mistakes (a stale device token, a `.env.local` pointing at the wrong
+backend, a uvicorn left running against somebody else's database):
+
+```bash
+# terminal 1 - backend
+cd backend && .venv/bin/uvicorn app.main:app --port 8000
+# terminal 2 - frontend production build
+cd by_billy/frontend && npm run build && npm run start
+# terminal 3
+cd backend && bash scripts/e2e_live.sh      # prints PASS/FAIL per check, exits non-zero on any FAIL
+```
+
+It reads the gateway credentials and the device token from `by_billy/frontend/.env.local`; every
+value can be overridden through the environment (`MEDSEAL_GATEWAY_USER`, `MEDSEAL_GATEWAY_PASSWORD`,
+`MEDSEAL_DEVICE_TOKEN`, `MEDSEAL_BACKEND_URL`, `MEDSEAL_FRONTEND_URL`). Check (e) runs a real
+50-image PGD crash test, so allow it a few minutes (`MEDSEAL_E2E_CRASH_TIMEOUT`, default 1800 s).
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| `/seal` uploads fail with 401 although the browser is authenticated | The device token in `.env.local` does not belong to a device in the database the backend is using. Re-mint it: `python -m scripts.create_demo_device`, then paste the printed token into `MEDSEAL_DEVICE_TOKEN`. |
+| `/ledger/check` reports `anchor_mismatch` right after a fresh start | The database was reset or replaced but `backend/anchors/anchors.jsonl` was not. Anchors are append-only evidence kept outside the database, so move the stale file aside (`mv anchors/anchors.jsonl anchors/anchors.jsonl.old`) and seal again. |
+| Old seals verify as `forged` / `untrusted_device` | The device predates device certificates. Run `python -m scripts.certify_devices` with `MEDSEAL_ADMIN_TOKEN` set. |
+| `No images in data/nih` | `python -m scripts.fetch_dataset` has not been run. |
+| `detective` is `null` in `/verify` | `weights/detective.pt` does not exist yet: run `python -m scripts.train_detective` (~20 min). Everything else (seal, verify, shield, crash test, passport) works without it. |
