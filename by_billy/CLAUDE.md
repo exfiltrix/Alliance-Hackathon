@@ -1,6 +1,8 @@
-# Muhr — project context for Claude Code
+# MedSeal — frontend context for Claude Code
 
-**Muhr** — a web platform that protects medical images (X-ray, CT) and medical AI from tampering.
+Frontend part (`by_billy/frontend/`). Project-wide context, commands and invariants: `../CLAUDE.md`.
+
+**MedSeal** (Uzbek UI name: *Muhr*, "seal") — a web platform that protects medical images (X-ray, CT) and medical AI from tampering.
 Built for the National AI Hackathon (Namangan, 2026), track "Medicine", official task №6
 (AI ethics and safety standards for X-ray/CT analysis).
 
@@ -9,14 +11,14 @@ One-line pitch: *"A seal and an antivirus for medical images: we prove an image 
 ## What the product does
 
 1. **Seal** — signs an image at capture: tiles → SHA-256 → Merkle root → Ed25519 signature → append-only ledger.
-2. **Verify** — checks an image before a doctor/AI sees it: authentic / tampered (with tile-level location) / unsigned.
+2. **Verify** — checks an image before a doctor/AI sees it: authentic / tampered (with tile-level location) / unsigned / forged record.
 3. **AI detective** — for unsigned images: a CNN estimates tampering probability and shows a heatmap.
 4. **Crash test** — attacks a medical AI model (FGSM/PGD) and scores its robustness 0–10.
 5. **AI shield** — detects adversarial noise before an image reaches the diagnostic AI (feature squeezing).
 6. **Model passport** — a one-page report per AI model (robustness score, protection status, verdict), exportable to PDF.
 
-Detailed docs: `docs/SPEC.md`, `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/TASKS.md`, `docs/DEMO.md`.
-Working, tested reference for the seal logic: `reference/muhr_poc.py` — **port it, do not reinvent it.**
+Detailed docs (repo root): `docs/SPEC.md`, `docs/ARCHITECTURE.md`, `docs/API.md` (the backend contract), `docs/DEMO.md`, `docs/BLOCKCHAIN.md`, `docs/SECURITY.md`.
+Working, tested reference for the seal logic: `reference/medseal_poc.py`.
 
 ## Stack
 
@@ -42,10 +44,11 @@ backend/
     db.py, models.py   # SQLite tables
   tests/
   scripts/             # data prep, fake generation, detective training
-frontend/
-  app/(pages)/seal, verify, crash-test, passport/[id], dashboard
+by_billy/frontend/      # Next.js 16: src/app/{seal,verify,inbox,check,crash-test,passport,dashboard}
+contracts/             # MedSealAnchor smart contract (Hardhat)
+docs/
 data/                  # public/synthetic images only (gitignored)
-reference/muhr_poc.py
+reference/medseal_poc.py
 ```
 
 ## Commands
@@ -57,7 +60,8 @@ uvicorn app.main:app --reload --port 8000
 pytest -q
 
 # frontend
-cd frontend && npm install && npm run dev   # http://localhost:3000
+cd by_billy/frontend && npm install && cp .env.example .env.local && npm run dev   # http://localhost:3000
+npx tsc --noEmit -p . && npm run lint   # types + lint (also run by the pre-commit hook and CI)
 ```
 
 ## Rules
