@@ -1,5 +1,7 @@
 """Doctor cabinet extras: date-range filter, pagination, volume tiles, PDF export
 (docs/API.md "Inbox (doctor)")."""
+import pytest
+
 from app.automation import inbox as inbox_mod
 from app.db import SessionLocal
 from tests.conftest import doctor_headers, xray_png
@@ -51,6 +53,20 @@ def test_single_check_pdf_is_a_pdf(client):
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/pdf"
     assert r.content.startswith(b"%PDF")
+
+
+@pytest.mark.parametrize("lang", ["uz", "ru", "en"])
+def test_single_check_pdf_in_every_language(client, lang):
+    item = upload(client, 6)
+    r = client.get(f"/api/inbox/{item['id']}/pdf", params={"lang": lang}, headers=doctor_headers())
+    assert r.status_code == 200
+    assert f"-{lang}.pdf" in r.headers["content-disposition"]
+    assert r.content.startswith(b"%PDF")
+
+
+def test_single_check_pdf_rejects_unknown_language(client):
+    item = upload(client, 7)
+    assert client.get(f"/api/inbox/{item['id']}/pdf", params={"lang": "de"}, headers=doctor_headers()).status_code == 422
 
 
 def test_single_check_pdf_requires_doctor_auth(client):

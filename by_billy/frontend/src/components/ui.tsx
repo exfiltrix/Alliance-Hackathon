@@ -1,8 +1,8 @@
 "use client";
 
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { useLanguage } from "@/lib/language-context";
-import dictionary from "@/lib/dictionary";
+import dictionary, { LANGS, type Lang } from "@/lib/dictionary";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -56,6 +56,35 @@ export function Segmented<T extends string | number>({
           }`}
         >
           {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** PDF language, following the UI language until the user picks one. */
+export function usePdfLang(): [Lang, (l: Lang) => void] {
+  const { lang } = useLanguage();
+  const [picked, setPicked] = useState<Lang | null>(null);
+  return [picked ?? lang, setPicked];
+}
+
+export function PdfLangPicker({ value, onChange }: { value: Lang; onChange: (l: Lang) => void }) {
+  const { t } = useLanguage();
+  return (
+    <div role="group" aria-label={t(dictionary.common.pdfLanguage)} className="inline-flex gap-0.5 rounded-full bg-slate-100 p-0.5">
+      {LANGS.map((l) => (
+        <button
+          key={l.code}
+          type="button"
+          aria-pressed={value === l.code}
+          title={l.name}
+          onClick={() => onChange(l.code)}
+          className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+            value === l.code ? "bg-white text-foreground shadow-sm" : "text-muted hover:text-foreground"
+          }`}
+        >
+          {l.label}
         </button>
       ))}
     </div>

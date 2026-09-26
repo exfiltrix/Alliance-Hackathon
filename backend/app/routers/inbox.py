@@ -80,7 +80,7 @@ def inbox_item(item_id: int, session: Session = Depends(get_session)):
 
 
 @router.get("/inbox/{item_id}/pdf")
-def inbox_item_pdf(item_id: int, lang: Literal["uz", "ru"] = "uz", session: Session = Depends(get_session)):
+def inbox_item_pdf(item_id: int, lang: Literal["uz", "ru", "en"] = "uz", session: Session = Depends(get_session)):
     item = session.get(InboxItem, item_id)
     if item is None:
         raise HTTPException(404, "Inbox item not found")
@@ -94,7 +94,7 @@ class BatchPdfIn(BaseModel):
 
 
 @router.post("/inbox/batch-pdf")
-def inbox_batch_pdf(body: BatchPdfIn, lang: Literal["uz", "ru"] = "uz", session: Session = Depends(get_session)):
+def inbox_batch_pdf(body: BatchPdfIn, lang: Literal["uz", "ru", "en"] = "uz", session: Session = Depends(get_session)):
     items = []
     for item_id in body.ids:
         item = session.get(InboxItem, item_id)

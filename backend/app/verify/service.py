@@ -35,6 +35,21 @@ from app.verify.preview import render_preview
 DOCTOR_NOTE = "Final decision is made by the doctor."
 
 
+def _analysis(result: dict, display) -> dict | None:
+    """AI reading only for a trusted image: authentic seal and a shield that saw no attack."""
+    if not settings.ai_enabled:
+        return None
+    from app.ai import analysis  # torch-free
+
+    if result["status"] != "authentic":
+        return analysis.blocked(result["status"])
+    if result["shield"] is None:
+        return analysis.blocked("shield_unavailable")
+    if result["shield"]["attack_suspected"]:
+        return analysis.blocked("attack_suspected")
+    return hooks.run_analysis(display)
+
+
 def _check_row(session: Session, row) -> tuple[Device | None, str | None, str | None]:
     """Return (device, fatal reason, non-fatal warning).
 
@@ -177,9 +192,11 @@ def verify_upload(session: Session, image: LoadedImage, actor: str = "anonymous"
         if result["status"] == "unsigned":
             result["detective"] = hooks.run_detective(display)
         result["shield"] = hooks.run_shield(display)
+        result["analysis"] = _analysis(result, display)
     else:
         result["detective"] = None
         result["shield"] = None
+        result["analysis"] = None
         result["ai_note"] = "not_applicable"
     if image.burned_in_annotation:
         result["phi_warning"] = "burned_in_annotation"

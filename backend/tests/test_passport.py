@@ -161,7 +161,7 @@ def test_not_allowed_without_shield(client, model_id, tmp_path, monkeypatch):
     assert p["verdict"] == "not_allowed" and p["conditions"] == ["clinical_validation_required", "retest_required"]
 
 
-@pytest.mark.parametrize("lang", ["uz", "ru"])
+@pytest.mark.parametrize("lang", ["uz", "ru", "en"])
 def test_pdf(client, model_id, lang):
     add_crash_test(model_id)
     pid = client.post("/api/passport", json={"model_id": model_id, "organisation": "Oʻzbekiston"}, headers=admin_headers()).json()["id"]
@@ -175,7 +175,7 @@ def test_pdf(client, model_id, lang):
 def test_pdf_rejects_unknown_language(client, model_id):
     add_crash_test(model_id)
     pid = client.post("/api/passport", json={"model_id": model_id}, headers=admin_headers()).json()["id"]
-    assert client.get(f"/api/passport/{pid}/pdf", params={"lang": "en"}).status_code == 422
+    assert client.get(f"/api/passport/{pid}/pdf", params={"lang": "de"}).status_code == 422
 
 
 def test_old_database_gets_new_columns(tmp_path):

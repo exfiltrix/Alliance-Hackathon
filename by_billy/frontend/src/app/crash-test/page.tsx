@@ -12,7 +12,8 @@ import type { AiModel, AttackMethod, CrashTestJob } from "@/lib/types";
 import { CrashTestIcon } from "@/components/icons";
 
 const d = dictionary.crash;
-const EPS = [0.5, 1, 2, 4];
+// eps 0.5 dropped: it took half the run time and is not part of the score or the passport protocol.
+const EPS = [1, 2, 4];
 // P1-04: the passport protocol requires >=50 images, so smaller demo-only counts are gone —
 // every option here can actually produce a passport-eligible result.
 const IMAGE_COUNTS = [50, 100];
@@ -133,6 +134,7 @@ export default function CrashTestPage() {
                 onChange={setMethod}
                 disabled={running}
               />
+              {method !== "pgd" && <p className="mt-2 text-xs text-amber-700">{t(d.fgsmNoPassport)}</p>}
             </div>
           </div>
 

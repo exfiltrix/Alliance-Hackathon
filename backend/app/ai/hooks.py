@@ -40,6 +40,22 @@ def run_detective(px: np.ndarray) -> dict | None:
         return None
 
 
+def run_analysis(px: np.ndarray) -> dict | None:
+    """Pathology scores for a trusted image (see app/ai/analysis.py); None if the model is unavailable."""
+    if not settings.ai_enabled:
+        return None
+    try:
+        from app.ai import analysis, model
+    except ImportError:
+        return None
+    try:
+        with _AI_LOCK:
+            return analysis.read(model.predict(px))
+    except Exception:  # the seal verdict must not be lost because the AI block failed
+        log.exception("analysis failed")
+        return None
+
+
 def run_shield(px: np.ndarray) -> dict | None:
     if not settings.ai_enabled:
         return None

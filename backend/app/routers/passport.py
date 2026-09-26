@@ -104,7 +104,7 @@ def get_passport(passport_id: int, session: Session = Depends(get_session)):
 
 
 @router.get("/passport/{passport_id}/pdf")
-def passport_pdf(passport_id: int, lang: Literal["uz", "ru"] = "uz", session: Session = Depends(get_session)):
+def passport_pdf(passport_id: int, lang: Literal["uz", "ru", "en"] = "uz", session: Session = Depends(get_session)):
     body = pdf.render(passport_json(_get(session, passport_id)), lang)
     return Response(
         body,

@@ -50,6 +50,23 @@ T = {
         "no": "Нет",
         "none": "—",
     },
+    "en": {
+        "title": "Verification report",
+        "file": "File",
+        "received_at": "Received",
+        "status": "Status",
+        "device": "Device",
+        "changed_tiles": "Changed tiles",
+        "detective": "Forgery probability (a probability, not proof)",
+        "reasons": "Reasons",
+        "reviewed": "Reviewed by a doctor",
+        "note": "The final decision is made by a doctor.",
+        "footer": "MedSeal · verification report · {date}",
+        "severities": {"danger": "Danger", "warning": "Warning", "ok": "OK", "processing": "Processing"},
+        "yes": "Yes",
+        "no": "No",
+        "none": "—",
+    },
 }
 
 

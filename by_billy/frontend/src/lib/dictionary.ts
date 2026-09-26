@@ -168,6 +168,7 @@ const dictionary = {
   },
   common: {
     back: { uz: "Orqaga", ru: "Назад", en: "Back" },
+    pdfLanguage: { uz: "PDF tili", ru: "Язык PDF", en: "PDF language" },
     breadcrumb: { uz: "Siz shu yerdasiz", ru: "Вы здесь", en: "You are here" },
     doctorDecides: {
       uz: "Yakuniy qarorni shifokor qabul qiladi.",
@@ -424,9 +425,9 @@ const dictionary = {
     },
     aiNote: {
       not_applicable: {
-        uz: "Bu tasvir AI shield va detektivining tasdiqlangan domeniga kirmaydi; ular ishga tushirilmadi.",
-        ru: "Этот снимок не входит в подтверждённую область AI-щита и детектива; они не запускались.",
-        en: "This image is outside the validated domain of the AI shield and detective; they were not run.",
+        uz: "Bu koʻkrak qafasi rentgeni emas (masalan, KT). AI modullari (qalqon, detektiv, tahlil) faqat koʻkrak qafasi rentgeniga oʻrgatilgan, shuning uchun ishga tushirilmadi. Suratning haqiqiyligi muhr bilan tekshirildi.",
+        ru: "Это не рентген грудной клетки (например, КТ). ИИ-модули (щит, детектив, анализ) обучены только на рентгене грудной клетки, поэтому не запускались. Подлинность снимка проверена печатью.",
+        en: "This is not a chest X-ray (e.g. a CT scan). The AI modules (shield, detective, reading) are trained on chest X-rays only, so they were not run. The image's authenticity was checked by the seal.",
       },
     },
     shieldTitle: { uz: "AI qalqon", ru: "AI-щит", en: "AI shield" },
@@ -439,6 +440,112 @@ const dictionary = {
     },
     shieldScore: { uz: "Ko'rsatkich", ru: "Показатель", en: "Score" },
     threshold: { uz: "chegara", ru: "порог", en: "threshold" },
+    analysis: {
+      title: { uz: "AI tahlili va yoʻnalish", ru: "ИИ-анализ и направление", en: "AI reading and referral" },
+      findingsTitle: { uz: "Ehtimoliy topilmalar", ru: "Возможные находки", en: "Possible findings" },
+      noFindings: { uz: "Aniq belgilar topilmadi", ru: "Выраженных признаков не найдено", en: "No clear signs found" },
+      shownAbove: { uz: "Koʻrsatilgan: ehtimollik ≥", ru: "Показаны находки с вероятностью ≥", en: "Shown: probability ≥" },
+      referralTitle: { uz: "Tavsiya etilgan yoʻnalish", ru: "Рекомендуемое направление", en: "Suggested referral" },
+      experimental: {
+        uz: "Tajribaviy: bu tashxis emas, AI ehtimolligi. Model faqat koʻkrak qafasi rentgeni uchun.",
+        ru: "Экспериментально: это не диагноз, а вероятность ИИ. Модель — только для рентгена грудной клетки.",
+        en: "Experimental: this is an AI probability, not a diagnosis. The model is for chest X-rays only.",
+      },
+      riskTitle: { uz: "Tavsiya", ru: "Что делать", en: "What to do" },
+      risk: {
+        high: {
+          title: { uz: "Yuqori xavf — imkon qadar tezroq shifokorga", ru: "Высокий риск — как можно скорее к врачу", en: "High risk — see a doctor as soon as possible" },
+          text: {
+            uz: "Jiddiy belgilar ehtimoli yuqori. Kutmang: bugunoq quyidagi mutaxassisga yoki shoshilinch yordamga murojaat qiling.",
+            ru: "Высокая вероятность серьёзных признаков. Не откладывайте: обратитесь к специалисту ниже или в неотложную помощь сегодня.",
+            en: "Serious signs are likely. Do not wait: see the specialist below or emergency care today.",
+          },
+        },
+        medium: {
+          title: { uz: "Shifokorga murojaat qiling", ru: "Обратитесь к врачу", en: "See a doctor" },
+          text: {
+            uz: "Ba'zi belgilar topildi. Yaqin kunlarda quyidagi mutaxassisga yoziling va uning tavsiyalariga amal qiling.",
+            ru: "Найдены отдельные признаки. Запишитесь к специалисту ниже в ближайшие дни и следуйте его рекомендациям.",
+            en: "Some signs were found. Book the specialist below within days and follow their advice.",
+          },
+        },
+        none: {
+          title: { uz: "Xavf topilmadi — hammasi joyida", ru: "Рисков не найдено — всё в порядке", en: "No risk found — all good" },
+          text: {
+            uz: "AI patologiya belgilarini topmadi. Rejali koʻriklarni davom ettiring; shikoyat boʻlsa — shifokorga.",
+            ru: "ИИ не нашёл признаков патологий. Продолжайте плановые осмотры; при жалобах — к врачу.",
+            en: "The AI found no signs of disease. Keep up routine check-ups; see a doctor if you have symptoms.",
+          },
+        },
+      },
+      riskShort: {
+        high: { uz: "Shoshilinch", ru: "Срочно к врачу", en: "Urgent" },
+        medium: { uz: "Shifokorga", ru: "К врачу", en: "See a doctor" },
+        none: { uz: "Xavf yoʻq", ru: "Без рисков", en: "No risk" },
+      },
+      blockedTitle: { uz: "AI tahlili bloklandi", ru: "ИИ-анализ заблокирован", en: "AI reading blocked" },
+      blocked: {
+        tampered: {
+          uz: "Surat oʻzgartirilgan — soxta tasvir boʻyicha tashxis qoʻyilmaydi.",
+          ru: "Снимок изменён — по поддельному изображению диагноз не ставится.",
+          en: "The image was altered — a forged image is never read.",
+        },
+        forged: {
+          uz: "Muhr yozuvi soxta — suratga ishonib boʻlmaydi.",
+          ru: "Запись печати поддельная — снимку нельзя доверять.",
+          en: "The seal record is forged — the image cannot be trusted.",
+        },
+        unsigned: {
+          uz: "Surat muhrlanmagan — kelib chiqishi tasdiqlanmagan. Asl suratni soʻrang.",
+          ru: "Снимок не подписан — происхождение не подтверждено. Запросите оригинал.",
+          en: "The image is not sealed — its origin is unconfirmed. Request the original.",
+        },
+        attack_suspected: {
+          uz: "Yashirin hujum belgisi bor — AI javobi aldangan boʻlishi mumkin.",
+          ru: "Есть признаки скрытой атаки — ответ ИИ может быть подменён.",
+          en: "Signs of a hidden attack — the AI's answer could be manipulated.",
+        },
+        shield_unavailable: {
+          uz: "AI qalqoni ishlamayapti — hujum yoʻqligini tekshirib boʻlmadi.",
+          ru: "ИИ-щит недоступен — нельзя исключить атаку.",
+          en: "The AI shield is unavailable — an attack cannot be ruled out.",
+        },
+      },
+      urgency: {
+        urgent: { uz: "Shoshilinch", ru: "Срочно", en: "Urgent" },
+        soon: { uz: "Yaqin kunlarda", ru: "В ближайшие дни", en: "Within days" },
+        routine: { uz: "Rejali", ru: "Планово", en: "Routine" },
+      },
+      specialty: {
+        pulmonology: { uz: "Pulmonolog", ru: "Пульмонолог", en: "Pulmonologist" },
+        cardiology: { uz: "Kardiolog", ru: "Кардиолог", en: "Cardiologist" },
+        oncology: { uz: "Onkolog (KT tavsiya etiladi)", ru: "Онколог (рекомендуется КТ)", en: "Oncologist (CT recommended)" },
+        thoracic_surgery: { uz: "Torakal jarroh", ru: "Торакальный хирург", en: "Thoracic surgeon" },
+        traumatology: { uz: "Travmatolog", ru: "Травматолог", en: "Traumatologist" },
+        surgery: { uz: "Jarroh", ru: "Хирург", en: "Surgeon" },
+        general_practice: { uz: "Terapevt (rejali koʻrik)", ru: "Терапевт (плановый осмотр)", en: "General practitioner (routine check)" },
+      },
+      pathology: {
+        Atelectasis: { uz: "Atelektaz", ru: "Ателектаз", en: "Atelectasis" },
+        Consolidation: { uz: "Konsolidatsiya", ru: "Консолидация", en: "Consolidation" },
+        Infiltration: { uz: "Infiltratsiya", ru: "Инфильтрация", en: "Infiltration" },
+        Pneumothorax: { uz: "Pnevmotoraks", ru: "Пневмоторакс", en: "Pneumothorax" },
+        Edema: { uz: "Oʻpka shishi", ru: "Отёк лёгких", en: "Pulmonary edema" },
+        Emphysema: { uz: "Emfizema", ru: "Эмфизема", en: "Emphysema" },
+        Fibrosis: { uz: "Fibroz", ru: "Фиброз", en: "Fibrosis" },
+        Effusion: { uz: "Plevral suyuqlik", ru: "Плевральный выпот", en: "Pleural effusion" },
+        Pneumonia: { uz: "Pnevmoniya", ru: "Пневмония", en: "Pneumonia" },
+        Pleural_Thickening: { uz: "Plevra qalinlashuvi", ru: "Утолщение плевры", en: "Pleural thickening" },
+        Cardiomegaly: { uz: "Kardiomegaliya", ru: "Кардиомегалия", en: "Cardiomegaly" },
+        Nodule: { uz: "Oʻpkadagi tugun", ru: "Узелок в лёгком", en: "Lung nodule" },
+        Mass: { uz: "Hajmli hosila", ru: "Объёмное образование", en: "Mass" },
+        Hernia: { uz: "Churra", ru: "Грыжа", en: "Hernia" },
+        "Lung Lesion": { uz: "Oʻpka oʻchogʻi", ru: "Очаговое поражение лёгкого", en: "Lung lesion" },
+        Fracture: { uz: "Suyak sinishi", ru: "Перелом", en: "Fracture" },
+        "Lung Opacity": { uz: "Oʻpka xiralashuvi", ru: "Затемнение в лёгком", en: "Lung opacity" },
+        "Enlarged Cardiomediastinum": { uz: "Oʻrta devor kengayishi", ru: "Расширение средостения", en: "Enlarged cardiomediastinum" },
+      } as Record<string, { uz: string; ru: string; en: string }>,
+    },
     demoHint: {
       uz: "Demo: fayl nomida \"fake\" → o'zgartirilgan, \"attack\" → hujum, muhrlangan fayl → tasdiqlangan.",
       ru: "Демо: в имени файла \"fake\" → изменён, \"attack\" → атака, запечатанный файл → подтверждён.",
@@ -492,6 +599,11 @@ const dictionary = {
       uz: "Bu natija pasport protokoliga mos kelmaydi (kerak: PGD, kamida 50 surat, eps=1 kiritilgan). Pasport yaratib bo'lmaydi.",
       ru: "Этот результат не соответствует протоколу паспорта (нужно: PGD, не менее 50 снимков, eps=1 включён). Выдать паспорт нельзя.",
       en: "This result does not meet the passport protocol (needs PGD, at least 50 images, eps=1 included). A passport cannot be issued.",
+    },
+    fgsmNoPassport: {
+      uz: "FGSM faqat namoyish uchun: bu natija bo'yicha pasport yaratib bo'lmaydi. Pasport uchun PGD ni tanlang.",
+      ru: "FGSM — только для демонстрации: по этому результату паспорт выдать нельзя. Для паспорта выберите PGD.",
+      en: "FGSM is for demonstration only: no passport can be issued from this result. Choose PGD for a passport.",
     },
   },
   passport: {

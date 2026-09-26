@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import PageShell from "@/components/PageShell";
-import { Button, Card, DoctorNote, ErrorBox, Spinner, errorMessage } from "@/components/ui";
+import AnalysisCard, { RISK_CLASS } from "@/components/AnalysisCard";
+import { Button, Card, DoctorNote, ErrorBox, PdfLangPicker, Spinner, errorMessage, usePdfLang } from "@/components/ui";
 import { useLanguage } from "@/lib/language-context";
 import dictionary, { localeOf } from "@/lib/dictionary";
 import { api, pngSrc } from "@/lib/api";
@@ -81,9 +82,10 @@ function MultiDrop({ onFiles, busy }: { onFiles: (files: File[]) => void; busy: 
 }
 
 function Detail({ item, onReviewed }: { item: InboxItem; onReviewed: () => void }) {
-  const { t, lang } = useLanguage();
+  const { t } = useLanguage();
   const [result, setResult] = useState<VerifyResponse | { error: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pdfLang, setPdfLang] = usePdfLang();
 
   useEffect(() => {
     api.getInboxItem(item.id).then((x) => setResult(x.result)).catch(() => setResult({ error: "—" }));
@@ -120,9 +122,13 @@ function Detail({ item, onReviewed }: { item: InboxItem; onReviewed: () => void 
             {result.shield.attack_suspected ? t(dictionary.verify.shieldFlag) : t(dictionary.verify.shieldClean)}
           </p>
         )}
+        {"preview_png" in result && <AnalysisCard analysis={result.analysis} />}
         <DoctorNote />
+        <div className="flex justify-center">
+          <PdfLangPicker value={pdfLang} onChange={setPdfLang} />
+        </div>
         <a
-          href={api.inboxItemPdfUrl(item.id, lang)}
+          href={api.inboxItemPdfUrl(item.id, pdfLang)}
           target="_blank"
           rel="noreferrer"
           className="block text-center text-xs font-medium text-accent underline underline-offset-2"
@@ -148,6 +154,7 @@ export default function InboxPage() {
   const [auto, setAuto] = useState<AutomationStatus | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pdfLang, setPdfLang] = usePdfLang();
   const [batch, setBatch] = useState<Batch | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [severity, setSeverity] = useState<Severity | "">("");
@@ -221,10 +228,10 @@ export default function InboxPage() {
       return null;
     });
     if (!full) return;
-    const header = ["id", "file_name", "received_at", "status", "severity", "reasons", "device", "changed_tiles", "detective_probability", "reviewed"];
+    const header = ["id", "file_name", "received_at", "status", "severity", "reasons", "device", "changed_tiles", "detective_probability", "risk", "reviewed"];
     const rows = full.items.map((i) => [
       i.id, i.file_name, i.received_at, i.status, i.severity, i.reasons.join(" "), i.device ?? "",
-      i.changed_tiles, i.detective_probability ?? "", i.reviewed ? "1" : "0",
+      i.changed_tiles, i.detective_probability ?? "", i.risk ?? "", i.reviewed ? "1" : "0",
     ]);
     const csv = [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
     download(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }), "medseal-inbox.csv");
@@ -233,7 +240,7 @@ export default function InboxPage() {
   const downloadBatchPdf = async () => {
     if (!batch?.ids.length) return;
     try {
-      const url = await api.batchPdfUrl(batch.ids, lang);
+      const url = await api.batchPdfUrl(batch.ids, pdfLang);
       download(url, "medseal-batch.pdf");
     } catch (e) {
       setError(errorMessage(e));
@@ -317,9 +324,12 @@ export default function InboxPage() {
               <span className="text-amber-700">{t(d.batchReview)}: {batch.review}</span>
               <span className="text-danger">{t(d.batchBlock)}: {batch.block}</span>
               {!busy && batch.ids.length > 0 && (
-                <button onClick={downloadBatchPdf} className="ml-auto text-xs font-medium text-accent underline underline-offset-2">
+                <span className="ml-auto flex items-center gap-2">
+                <PdfLangPicker value={pdfLang} onChange={setPdfLang} />
+                <button onClick={downloadBatchPdf} className=" text-xs font-medium text-accent underline underline-offset-2">
                   {t(d.batchDownloadPdf)}
                 </button>
+                </span>
               )}
             </div>
           </Card>
@@ -377,6 +387,11 @@ export default function InboxPage() {
                       {item.source === "folder" ? t(d.fromFolder) : t(d.fromUpload)}
                       {item.device ? ` · ${item.device}` : ""}
                     </span>
+                    {item.risk && (
+                      <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${RISK_CLASS[item.risk]}`}>
+                        {t(dictionary.verify.analysis.riskShort[item.risk])}
+                      </span>
+                    )}
                     {item.reviewed ? (
                       <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600">{t(d.reviewed)}</span>
                     ) : (

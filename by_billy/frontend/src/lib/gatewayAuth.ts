@@ -18,6 +18,9 @@ function safeEqual(a: string, b: string): boolean {
 export type GatewayAuthResult = { ok: true } | { ok: false; status: 401 | 503; message: string };
 
 export function checkGatewayAuth(authorizationHeader: string | null): GatewayAuthResult {
+  // Explicit opt-out for a trusted demo network only; any other value (or unset) keeps the gate.
+  if (process.env.MEDSEAL_GATEWAY_AUTH === "off") return { ok: true };
+
   const user = process.env.MEDSEAL_GATEWAY_USER;
   const pass = process.env.MEDSEAL_GATEWAY_PASSWORD;
   if (!user || !pass) {

@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import PageShell from "@/components/PageShell";
-import { Button, Card, DoctorNote, ErrorBox, Field, Spinner, buttonClass, errorMessage } from "@/components/ui";
+import { Button, Card, DoctorNote, ErrorBox, Field, PdfLangPicker, Spinner, buttonClass, errorMessage, usePdfLang } from "@/components/ui";
 import { useLanguage } from "@/lib/language-context";
 import dictionary, { localeOf } from "@/lib/dictionary";
 import { api } from "@/lib/api";
@@ -24,6 +24,7 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
   const { t, lang } = useLanguage();
   const [passport, setPassport] = useState<Passport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pdfLang, setPdfLang] = usePdfLang();
 
   const load = () =>
     api
@@ -47,7 +48,7 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
     </span>
   );
 
-  const pdfUrl = passport ? api.passportPdfUrl(passport.id, lang) : "";
+  const pdfUrl = passport ? api.passportPdfUrl(passport.id, pdfLang) : "";
   const r = passport?.robustness;
 
   return (
@@ -157,7 +158,8 @@ export default function PassportPage({ params }: { params: Promise<{ id: string 
             <DoctorNote />
           </Card>
 
-          <div className="flex flex-col gap-3 sm:flex-row print:hidden">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center print:hidden">
+            {pdfUrl && <PdfLangPicker value={pdfLang} onChange={setPdfLang} />}
             {pdfUrl && (
               <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className={buttonClass("dark")}>
                 {t(d.downloadPdf)}

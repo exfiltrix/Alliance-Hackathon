@@ -35,7 +35,7 @@ REASON_CODES = frozenset({
     "burned_in_annotation",                                              # PHI visible in the pixels
     "unreadable",                                                        # raised here, not by /verify
 })
-LISTING_FIELDS = ("device", "changed_tiles", "detective_probability", "error")
+LISTING_FIELDS = ("device", "changed_tiles", "detective_probability", "risk", "error")
 
 
 def triage(result: dict) -> tuple[str, list[str]]:
@@ -63,8 +63,15 @@ def triage(result: dict) -> tuple[str, list[str]]:
     return "ok", []
 
 
+def _risk(result: dict) -> str | None:
+    """AI reading's overall advice (high/medium/none), only when the image was trusted and read."""
+    analysis = result.get("analysis") or {}
+    return analysis.get("risk") if analysis.get("status") == "done" else None
+
+
 def _summarize(result: dict) -> dict:
     return {
+        "risk": _risk(result),
         "device": result.get("device"),
         "changed_tiles": len(result.get("changed_tiles") or []),
         "detective_probability": (result.get("detective") or {}).get("probability"),
@@ -138,6 +145,7 @@ def summary(item: InboxItem) -> dict:
         "device": stored.get("device", result.get("device")),
         "changed_tiles": stored.get("changed_tiles", 0),
         "detective_probability": stored.get("detective_probability"),
+        "risk": stored["risk"] if "risk" in stored else _risk(result),
         "error": stored.get("error", result.get("error")),
     }
 

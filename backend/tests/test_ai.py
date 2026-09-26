@@ -53,6 +53,18 @@ def test_attack_flips_prediction(healthy, method, eps):
     assert attacks.psnr(healthy, x_adv) > 40
 
 
+@pytest.mark.parametrize("eps", [0.5, 1.0])
+def test_early_stop_pgd_flips_the_same_images_as_full_pgd(eps):
+    """The crash test's per-image early stop is a speed-up only: same flips, same eps-ball."""
+    batch = torch.cat([model.preprocess(load_image((SAMPLES / f).read_bytes()).px) for f in HEALTHY])
+    idx = model.pathology_index("Pneumonia")
+    full = attacks.pgd(batch, eps)
+    fast = attacks.pgd(batch, eps, stop_when_flipped=True)
+    with torch.no_grad():
+        assert torch.equal(model.scores(full)[:, idx] > model.THRESHOLD, model.scores(fast)[:, idx] > model.THRESHOLD)
+    assert float((fast - batch).abs().max()) <= eps * model.PX_TO_NORM + 1e-3
+
+
 def test_attack_survives_saving_as_png(healthy):
     """The attacked image must still fool the model after 8-bit quantisation (demo uploads a PNG)."""
     x_adv = attacks.pgd(healthy, 2.0)

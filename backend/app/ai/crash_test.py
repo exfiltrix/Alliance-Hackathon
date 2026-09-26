@@ -14,7 +14,7 @@ from app.imaging import ImageError, display_pixels, load_image
 from app.verify.preview import render_preview
 
 SCORE_EPS = 1.0
-BATCH = 4  # fastest on a 4-core laptop CPU; larger batches are slower
+BATCH = 4  # fastest on a laptop CPU; 8 and 50 measured slower with per-image early stop
 IMAGE_SUFFIXES = {".png", ".dcm"}
 
 

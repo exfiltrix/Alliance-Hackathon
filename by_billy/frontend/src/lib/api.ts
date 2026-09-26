@@ -146,12 +146,12 @@ const realApi = {
   reviewInboxItem: (id: number) => viaProxy<InboxItem>(`/api/inbox/${id}/review`, { method: "POST" }),
   getAutomation: () => viaProxy<AutomationStatus>("/api/automation"),
   runAutomation: () => viaProxy<{ sealed: number; verified: number }>("/api/automation/run", { method: "POST" }),
-  inboxItemPdfUrl: (id: number, lang: "uz" | "ru" | "en") => `/api/inbox/${id}/pdf?lang=${lang === "ru" ? "ru" : "uz"}`,
+  inboxItemPdfUrl: (id: number, lang: "uz" | "ru" | "en") => `/api/inbox/${id}/pdf?lang=${lang}`,
   // Batch PDF is POST-only on the backend; fetch it here and hand back an object URL an <a> can
   // point at, since the browser needs a GET-able link to open/download a file.
   batchPdfUrl: async (ids: number[], lang: "uz" | "ru" | "en") => {
     ensureBackendConfigured();
-    const res = await fetch(`/api/inbox/batch-pdf?lang=${lang === "ru" ? "ru" : "uz"}`, {
+    const res = await fetch(`/api/inbox/batch-pdf?lang=${lang}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ids }),
@@ -205,9 +205,8 @@ const realApi = {
     });
   },
   getPassport: (id: number) => request<Passport>(`/passport/${id}`),
-  // The backend PDF exists in Uzbek and Russian; English UI gets the Uzbek PDF.
   passportPdfUrl: (id: number, lang: "uz" | "ru" | "en") =>
-    backendUrl(`${API_BASE_URL}/passport/${id}/pdf?lang=${lang === "ru" ? "ru" : "uz"}`),
+    backendUrl(`${API_BASE_URL}/passport/${id}/pdf?lang=${lang}`),
 
   getStats: () => request<Stats>("/stats"),
 };

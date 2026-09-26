@@ -243,4 +243,4 @@ def test_listing_no_longer_parses_the_stored_preview(client):
     with SessionLocal() as s:
         row = s.scalar(select(Model))
         assert len(json.loads(row.result_json)["preview_png"]) > 1000
-        assert set(json.loads(row.summary_json)) == {"device", "changed_tiles", "detective_probability", "error"}
+        assert set(json.loads(row.summary_json)) == {"device", "changed_tiles", "detective_probability", "risk", "error"}

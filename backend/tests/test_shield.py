@@ -75,6 +75,19 @@ def test_verify_reports_shield(client, device, attacked_png, monkeypatch):
     r = client.post("/api/verify", files={"file": ("a.png", sealed)}).json()
     assert r["status"] == "authentic"
     assert r["shield"]["attack_suspected"] is True
+    assert r["analysis"] == {"status": "blocked", "reason": "attack_suspected"}  # never read an attacked image
 
     clean = client.post("/api/verify", files={"file": ("c.png", (SAMPLES / HEALTHY[0]).read_bytes())}).json()
     assert clean["status"] == "unsigned" and clean["shield"]["attack_suspected"] is False
+
+
+def test_verify_reads_a_trusted_image(client, device, monkeypatch):
+    monkeypatch.setattr(settings, "ai_enabled", True)
+    seal = client.post("/api/seal", files={"file": ("c.png", (SAMPLES / HEALTHY[0]).read_bytes())}, headers=device["auth"]).json()
+    sealed = client.get(seal["download_url"], headers=device["auth"]).content
+    r = client.post("/api/verify", files={"file": ("c.png", sealed)}).json()
+    assert r["status"] == "authentic" and r["shield"]["attack_suspected"] is False
+    a = r["analysis"]
+    assert a["status"] == "done" and a["experimental"] is True
+    assert all(f["probability"] >= a["threshold"] for f in a["findings"])
+    assert a["referrals"]

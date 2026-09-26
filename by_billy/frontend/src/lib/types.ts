@@ -35,6 +35,8 @@ export type InboxItem = {
   device: string | null;
   changed_tiles: number;
   detective_probability: number | null;
+  // AI reading's overall advice; null when the image was not read (not trusted, AI off).
+  risk?: Risk | null;
   error: string | null;
 };
 
@@ -102,6 +104,26 @@ export type ForgedReason =
 // tile and pixel is untouched, but the DICOM PatientID hashes to a different seal record.
 export type TamperedReason = ForgedReason | "metadata_changed" | "seal_id_removed" | "patient_mismatch";
 
+export type Specialty =
+  | "pulmonology"
+  | "cardiology"
+  | "oncology"
+  | "thoracic_surgery"
+  | "traumatology"
+  | "surgery"
+  | "general_practice";
+export type Risk = "high" | "medium" | "none";
+export type Analysis =
+  | { status: "blocked"; reason: "tampered" | "forged" | "unsigned" | "attack_suspected" | "shield_unavailable" }
+  | {
+      status: "done";
+      risk: Risk;
+      experimental: boolean;
+      threshold: number;
+      findings: { pathology: string; probability: number }[];
+      referrals: { specialty: Specialty; urgency: "urgent" | "soon" | "routine"; pathologies: string[] }[];
+    };
+
 export type VerifyResponse = {
   status: VerifyStatus;
   uid?: string | null;
@@ -132,6 +154,9 @@ export type VerifyResponse = {
   // null when the AI is off on the backend; the public API intentionally omits Grad-CAM output.
   detective?: { probability: number; experimental: boolean } | null;
   shield: { attack_suspected: boolean; score: number; threshold: number } | null;
+  // AI reading + referral, only for a trusted image (authentic + shield quiet). null when the AI
+  // is off or not applicable. See API.md.
+  analysis?: Analysis | null;
   ai_note?: "not_applicable";
   note: string;
 };

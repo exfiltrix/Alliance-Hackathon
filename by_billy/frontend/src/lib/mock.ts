@@ -216,7 +216,17 @@ export const mockApi: Api = {
     } else if (/forged/.test(name)) {
       res = { status: "forged", uid: "1.3.6.1.4.1.9328", device: "KT-01", matched_by: "uid", changed_tiles: [], preview_png: await fileToPreview(file, []), shield, note };
     } else if (sealedNames.has(file.name) || /sealed|muhr/.test(name)) {
-      res = { status: "authentic", uid: "1.3.6.1.4.1.9328", device: "KT-01", matched_by: "uid", changed_tiles: [], preview_png: await fileToPreview(file, []), shield, note };
+      res = {
+        status: "authentic", uid: "1.3.6.1.4.1.9328", device: "KT-01", matched_by: "uid", changed_tiles: [],
+        preview_png: await fileToPreview(file, []), shield, note,
+        analysis: attacked
+          ? { status: "blocked", reason: "attack_suspected" }
+          : {
+              status: "done", risk: "medium", experimental: true, threshold: 0.6,
+              findings: [{ pathology: "Pneumonia", probability: 0.74 }],
+              referrals: [{ specialty: "pulmonology", urgency: "soon", pathologies: ["Pneumonia"] }],
+            },
+      };
     } else {
       res = {
         status: "unsigned",

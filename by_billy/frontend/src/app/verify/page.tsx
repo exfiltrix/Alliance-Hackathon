@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import PageShell from "@/components/PageShell";
+import AnalysisCard from "@/components/AnalysisCard";
 import UploadDropzone from "@/components/UploadDropzone";
 import { Button, Card, DoctorNote, ErrorBox, Field, ProgressBar, Spinner, errorMessage } from "@/components/ui";
 import { useLanguage } from "@/lib/language-context";
@@ -176,6 +177,7 @@ export default function VerifyPage() {
                 </Card>
               )}
 
+              {!result.ai_note && (
               <Card
                 className={result.shield?.attack_suspected ? "border-danger/40 bg-danger/5" : ""}
               >
@@ -207,6 +209,9 @@ export default function VerifyPage() {
                   <p className="mt-3 text-sm text-muted">{t(d.aiOff)}</p>
                 )}
               </Card>
+              )}
+
+              <AnalysisCard analysis={result.analysis} />
 
               <DoctorNote />
               <Button variant="ghost" onClick={reset} className="w-full">

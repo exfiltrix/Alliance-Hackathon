@@ -37,19 +37,32 @@ def pgd(
 ) -> torch.Tensor:
     """`steps` FGSM steps of size eps/4, projected back into the L-inf eps-ball around x.
 
-    stop_when_flipped: end early once every image in the batch crossed the threshold
-    (the crash test only needs to know whether a flip happens; saves most steps at large eps).
+    stop_when_flipped: stop attacking each image as soon as it crossed the threshold (the crash
+    test only needs to know whether a flip happens). The flip check reuses the forward pass of
+    the gradient step, so it costs no extra model call.
     """
     idx = pathology_index(pathology)
     eps = eps_px * PX_TO_NORM
     direction = _direction(x, idx)
     x_adv = x.clone()
-    for _ in range(steps):
-        x_adv = x_adv + direction * (eps / 4) * _grad(x_adv, idx).sign()
-        x_adv = torch.max(torch.min(x_adv, x + eps), x - eps).clamp(LO, HI).detach()
-        if stop_when_flipped and bool((_direction(x_adv, idx) != direction).all()):
+    if not stop_when_flipped:
+        for _ in range(steps):
+            x_adv = x_adv + direction * (eps / 4) * _grad(x_adv, idx).sign()
+            x_adv = torch.max(torch.min(x_adv, x + eps), x - eps).clamp(LO, HI).detach()
+        return x_adv
+
+    active = torch.arange(len(x))
+    for step in range(steps + 1):
+        xa = x_adv[active].clone().requires_grad_(True)
+        s = scores(xa)[:, idx]
+        still = torch.where(s.detach() < THRESHOLD, 1.0, -1.0) == direction[active].flatten()
+        if step == steps or not still.any():
             break
-    return x_adv
+        s.sum().backward()
+        active, grad = active[still], xa.grad[still]
+        stepped = x_adv[active] + direction[active] * (eps / 4) * grad.sign()
+        x_adv[active] = torch.max(torch.min(stepped, x[active] + eps), x[active] - eps).clamp(LO, HI)
+    return x_adv.detach()
 
 
 ATTACKS = {"fgsm": fgsm, "pgd": pgd}

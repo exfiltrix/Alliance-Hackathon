@@ -69,6 +69,9 @@ Python backend still separately requires the device bearer token (P0-1) regardle
   "preview_png": "base64…",
   "detective": { "probability": 0.87, "experimental": true },
   "shield": { "attack_suspected": false, "score": 3.64, "threshold": 10.42 },
+  "analysis": { "status": "done", "risk": "medium", "experimental": true, "threshold": 0.6,
+                "findings": [{ "pathology": "Pneumonia", "probability": 0.74 }],
+                "referrals": [{ "specialty": "pulmonology", "urgency": "soon", "pathologies": ["Pneumonia"] }] },
   "note": "Final decision is made by the doctor." }
 ```
 - `changed_tiles`: `[y, x]` of the top-left corner of each changed tile, in original image pixels; tile size is `tile`. `preview_png` already has red-outer/white-inner boxes drawn on them (visible in greyscale mode too; preview is scaled down to max 1024 px).
@@ -90,6 +93,10 @@ Python backend still separately requires the device bearer token (P0-1) regardle
 - `detective.probability` = chance the image was edited (0..1). The public verification response intentionally does not include Grad-CAM/heatmap output; it remains available to training evaluation code only. `experimental` is currently always `true`: the detector has not been validated on real, non-synthetic forgeries. ~50 ms; the first call after startup ~1 s.
 - `shield` runs on every status, including `authentic`: the seal proves where the image came from, the shield checks whether its pixels carry an adversarial attack (an attacked image can be sealed too).
 - `shield.score` is a distance, not a percentage (clean X-rays ≈ 3–8, attacked ≈ 10–100+); `attack_suspected = score > threshold`. Show it as "Yashirin hujum aniqlandi" / "Shubhali shovqin topilmadi" plus `score / threshold`, not as "87%". About 1% of clean images raise a false alarm, so it is a warning, not a verdict. Takes ~50 ms (first call after startup ~2 s: model load).
+- `analysis` — AI reading of the X-ray (18 torchxrayvision pathologies) and a referral hint (`app/ai/analysis.py`). **Only for a trusted image**: status `authentic` and the shield saw no attack; otherwise `{"status": "blocked", "reason": "tampered" | "forged" | "unsigned" | "attack_suspected" | "shield_unavailable"}` — a forged or attacked image must never turn into a diagnosis. `null` when the AI is off or not applicable (same as `shield`).
+  - `risk` — the overall advice for the patient: `high` (see a doctor as soon as possible: any finding ≥ 0.8, or pulmonary edema / pneumothorax at any finding score; 3% of normal NIH images vs 28% with findings), `medium` (a finding: see a doctor and follow their advice), `none` (no signs above the threshold: no risk found). Texts live in the frontend dictionary (`verify.analysis.risk`).
+  - `findings` = pathologies with score ≥ `threshold` (0.6), highest first. Not 0.5: on NIH "No Finding" images 81% have something above 0.5; at 0.6 it is 17% (vs 59% on images with findings). A probability, never a diagnosis: `experimental` is always `true`.
+  - `referrals` — `specialty` ∈ `pulmonology`, `cardiology`, `oncology`, `thoracic_surgery`, `traumatology`, `surgery`, `general_practice`; `urgency` ∈ `urgent` (the specialty has a `high`-risk finding), `soon` (any other finding), `routine` (no findings → `general_practice`, empty `pathologies`). Urgent first. Texts live in the frontend dictionary (`verify.analysis`).
 - UI labels: `authentic`/`tampered`/`forged` are certain ("Tasdiqlangan"); `detective` is a probability ("Ehtimollik 87%"), `shield` is a warning (see above).
 
 ## Blockchain anchoring
@@ -129,14 +136,15 @@ whole batch in one request.
 { "id": 7, "file_name": "patient_A.png", "source": "upload | folder", "received_at": "…",
   "status": "authentic | tampered | unsigned | forged | error", "severity": "danger | warning | ok",
   "reasons": ["tampered" | "forged" | "attack_suspected" | "unsigned" | "unreadable" | "device_revoked_later"],
-  "reviewed": false, "device": "Shlyuz-Auto", "changed_tiles": 0, "detective_probability": null, "error": null }
+  "reviewed": false, "device": "Shlyuz-Auto", "changed_tiles": 0, "detective_probability": null, "risk": null, "error": null }
+- `risk` = `analysis.risk` of the check (`high` / `medium` / `none`), `null` when the image was not read (not trusted, AI off). Shown next to the severity; it does not change the order.
 ```
 - danger = tampered / forged / shield attack / unreadable; warning = unsigned (detective gives a probability) or device revoked later; ok = authentic and shield quiet.
 
-`GET /inbox/{id}/pdf?lang=uz|ru` → one-page PDF report for this check (same content as the detail
+`GET /inbox/{id}/pdf?lang=uz|ru|en` → one-page PDF report for this check (same content as the detail
 view: status, severity, reasons, device, changed tiles, detective probability, the rendered preview
 with its red boxes, and the doctor-decides note).
-`POST /inbox/batch-pdf?lang=uz|ru` — body `{ids: [7, 8, 9]}` (max 50) → one PDF, one page per id, in
+`POST /inbox/batch-pdf?lang=uz|ru|en` — body `{ids: [7, 8, 9]}` (max 50) → one PDF, one page per id, in
 the given order. `404` if any id does not exist (nothing is generated for a partially-valid batch).
 
 ## Client cabinet (hospital/clinic, org-level)
@@ -227,7 +235,7 @@ when done:
 - A passport is frozen at issue time: later seals, verifications or crash tests do not change it. Issue a new one to refresh.
 
 `GET /passport/{id}` → passport JSON · `GET /passports?model_id=1` → summaries `[{id, created_at, organisation, verdict, conditions, model, robustness_score}]`, newest first
-`GET /passport/{id}/pdf?lang=uz|ru` → one-page A4 PDF (download; `Content-Disposition: attachment`). Default `uz`.
+`GET /passport/{id}/pdf?lang=uz|ru|en` → one-page A4 PDF (download; `Content-Disposition: attachment`). Default `uz`.
 `GET /passport/{id}/verify` (public) → `{"valid": bool, "fingerprint": "…"}` — see CRY-04 below.
 
 ```json
