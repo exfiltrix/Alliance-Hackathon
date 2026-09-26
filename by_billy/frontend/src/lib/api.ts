@@ -3,11 +3,16 @@ import type {
   AutomationStatus,
   CheckFileResult,
   CheckInfo,
+  ClientAlert,
+  ClientDevice,
+  ClientStats,
   CrashTestJob,
   InboxItem,
   InboxListing,
+  InboxQuery,
   CrashTestRequest,
   Passport,
+  PassportSummary,
   SealResponse,
   Stats,
   VerifyResponse,
@@ -75,6 +80,23 @@ const post = <T>(path: string, body: unknown) =>
     body: body instanceof FormData ? body : JSON.stringify(body),
   });
 
+// Same-origin Next.js route handler (src/app/api/**), not the backend directly: the bearer token
+// that authorizes the call (doctor / client) is a server-only secret, same reasoning as seal().
+async function viaProxy<T>(path: string, init?: RequestInit): Promise<T> {
+  ensureBackendConfigured();
+  const res = await fetch(path, init);
+  const text = await res.text();
+  if (!res.ok) throw new ApiError(res.status, detailOf(text) || res.statusText);
+  return (text ? JSON.parse(text) : undefined) as T;
+}
+
+function queryString(params: Record<string, string | number | boolean | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v !== undefined && v !== "") q.set(k, String(v));
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
 // download_url from the backend is absolute-path ("/api/seal/12/file").
 export function backendUrl(path: string): string {
   if (USE_MOCK || /^https?:|^data:/.test(path)) return path;
@@ -109,17 +131,40 @@ const realApi = {
     return post<VerifyResponse>("/verify", form);
   },
 
-  // Doctor's inbox: images are verified automatically, most urgent first.
+  // Doctor's inbox: images are verified automatically, most urgent first. Goes through the
+  // Next.js route handlers (src/app/api/inbox/**), not the backend directly — the doctor's
+  // bearer token is a server-only secret (MEDSEAL_DOCTOR_TOKEN), same reasoning as seal() above.
   uploadToInbox: (files: File[]) => {
+    ensureBackendConfigured();
     const form = new FormData();
     files.forEach((f) => form.append("files", f));
-    return post<InboxItem[]>("/inbox", form);
+    return viaProxy<InboxItem[]>("/api/inbox", { method: "POST", body: form });
   },
-  getInbox: () => request<InboxListing>("/inbox"),
-  getInboxItem: (id: number) => request<InboxItem & { result: VerifyResponse | { error: string } }>(`/inbox/${id}`),
-  reviewInboxItem: (id: number) => post<InboxItem>(`/inbox/${id}/review`, {}),
-  getAutomation: () => request<AutomationStatus>("/automation"),
-  runAutomation: () => post<{ sealed: number; verified: number }>("/automation/run", {}),
+  getInbox: (query: InboxQuery = {}) => viaProxy<InboxListing>(`/api/inbox${queryString(query)}`),
+  getInboxItem: (id: number) =>
+    viaProxy<InboxItem & { result: VerifyResponse | { error: string } }>(`/api/inbox/${id}`),
+  reviewInboxItem: (id: number) => viaProxy<InboxItem>(`/api/inbox/${id}/review`, { method: "POST" }),
+  getAutomation: () => viaProxy<AutomationStatus>("/api/automation"),
+  runAutomation: () => viaProxy<{ sealed: number; verified: number }>("/api/automation/run", { method: "POST" }),
+  inboxItemPdfUrl: (id: number, lang: "uz" | "ru" | "en") => `/api/inbox/${id}/pdf?lang=${lang === "ru" ? "ru" : "uz"}`,
+  // Batch PDF is POST-only on the backend; fetch it here and hand back an object URL an <a> can
+  // point at, since the browser needs a GET-able link to open/download a file.
+  batchPdfUrl: async (ids: number[], lang: "uz" | "ru" | "en") => {
+    ensureBackendConfigured();
+    const res = await fetch(`/api/inbox/batch-pdf?lang=${lang === "ru" ? "ru" : "uz"}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    if (!res.ok) throw new ApiError(res.status, detailOf(await res.text()) || res.statusText);
+    return URL.createObjectURL(await res.blob());
+  },
+
+  // Client (hospital/clinic) cabinet: strictly scoped server-side by MEDSEAL_CLIENT_TOKEN.
+  getClientDevices: () => viaProxy<ClientDevice[]>("/api/client/devices"),
+  getClientStats: () => viaProxy<ClientStats>("/api/client/stats"),
+  getClientAlerts: (limit = 50) => viaProxy<ClientAlert[]>(`/api/client/alerts?limit=${limit}`),
+  getClientPassports: () => viaProxy<PassportSummary[]>("/api/client/passports"),
 
   // Public QR check (no login): the page lives at /check/{token} on this site.
   getCheck: (token: string) => request<CheckInfo>(`/check/${encodeURIComponent(token)}`),

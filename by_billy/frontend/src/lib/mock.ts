@@ -282,10 +282,12 @@ export const mockApi: Api = {
     inbox.unshift(...added);
     return added;
   },
-  async getInbox() {
+  async getInbox(query = {}) {
     await wait(200);
     const rank = { danger: 0, warning: 1, ok: 2 } as const;
-    const items = [...inbox].sort((a, b) => Number(a.reviewed) - Number(b.reviewed) || rank[a.severity] - rank[b.severity] || b.id - a.id);
+    let items = [...inbox].sort((a, b) => Number(a.reviewed) - Number(b.reviewed) || rank[a.severity] - rank[b.severity] || b.id - a.id);
+    if (query.severity) items = items.filter((i) => i.severity === query.severity);
+    if (query.reviewed !== undefined) items = items.filter((i) => i.reviewed === query.reviewed);
     const open = inbox.filter((i) => !i.reviewed);
     return {
       counts: {
@@ -294,7 +296,8 @@ export const mockApi: Api = {
         ok: open.filter((i) => i.severity === "ok").length,
         total: inbox.length,
       },
-      items,
+      volume: { today: inbox.length, week: inbox.length, all: inbox.length },
+      items: items.slice(query.offset ?? 0, (query.offset ?? 0) + (query.limit ?? 200)),
     };
   },
   async getInboxItem(id) {
@@ -316,6 +319,41 @@ export const mockApi: Api = {
   },
   async runAutomation() {
     return { sealed: 0, verified: 0 };
+  },
+  inboxItemPdfUrl: () => "",
+  async batchPdfUrl() {
+    return "";
+  },
+
+  async getClientDevices() {
+    await wait(200);
+    return [
+      { id: 1, name: "KT-01", revoked: false, certified: true, created_at: new Date().toISOString(),
+        last_seal_at: new Date().toISOString(), seal_count: 128 },
+      { id: 2, name: "KT-02", revoked: true, certified: true, created_at: new Date().toISOString(),
+        last_seal_at: null, seal_count: 4 },
+    ];
+  },
+  async getClientStats() {
+    await wait(200);
+    return {
+      hospital: "Namangan viloyat shifoxonasi",
+      devices: { total: 2, active: 1, revoked: 1, certified: 2 },
+      seals: { today: 4, "7d": 21, total: 132 },
+      verifications: { total: 40, by_result: { authentic: 35, tampered: 3, forged: 2 } },
+    };
+  },
+  async getClientAlerts() {
+    await wait(200);
+    return [];
+  },
+  async getClientPassports() {
+    await wait(200);
+    return [{
+      id: 1, created_at: new Date().toISOString(), organisation: "Namangan viloyat shifoxonasi",
+      verdict: "allowed_with_conditions", conditions: ["clinical_validation_required", "shield_required"],
+      model: models[0], robustness_score: 5.2,
+    }];
   },
   async getCheck() {
     await wait(300);

@@ -40,7 +40,20 @@ export type InboxItem = {
 
 export type InboxListing = {
   counts: Record<Severity, number> & { total: number };
+  // Raw activity counts (any severity) for the doctor's summary tiles, independent of "counts"
+  // above (which is unreviewed-only, danger/warning/ok).
+  volume: { today: number; week: number; all: number };
   items: InboxItem[];
+};
+
+// GET /inbox query params (docs/API.md "Inbox (doctor)"). since/until are plain "YYYY-MM-DD".
+export type InboxQuery = {
+  limit?: number;
+  offset?: number;
+  severity?: Severity;
+  reviewed?: boolean;
+  since?: string;
+  until?: string;
 };
 
 export type AutomationStatus = {
@@ -222,6 +235,45 @@ export type Passport = {
   rules: { allow_score: number; shield_min_detection: number; shield_max_false_alarms: number };
   protocol: { method: AttackMethod; min_images: number; eps_required: number[] };
   note: string;
+};
+
+// Client (hospital/clinic) cabinet — docs/API.md "Client cabinet". Strictly scoped server-side to
+// one organisation by MEDSEAL_CLIENT_TOKEN; the frontend never chooses which hospital it sees.
+export type ClientDevice = {
+  id: number;
+  name: string;
+  revoked: boolean;
+  certified: boolean;
+  created_at: string;
+  last_seal_at: string | null;
+  seal_count: number;
+};
+
+export type ClientStats = {
+  hospital: string;
+  devices: { total: number; active: number; revoked: number; certified: number };
+  seals: { today: number; "7d": number; total: number };
+  verifications: { total: number; by_result: Partial<Record<VerifyStatus, number>> };
+};
+
+export type ClientAlert = {
+  at: string;
+  seal_id: number;
+  uid: string | null;
+  device: string | null;
+  result: VerifyStatus;
+  shield_flag: boolean | null;
+};
+
+// GET /client/passports and GET /passports share this summary shape (see routers/passport.py).
+export type PassportSummary = {
+  id: number;
+  created_at: string;
+  organisation: string;
+  verdict: Verdict;
+  conditions: PassportCondition[];
+  model: AiModel;
+  robustness_score: number;
 };
 
 export type Stats = {

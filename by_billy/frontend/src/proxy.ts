@@ -4,7 +4,9 @@ import { checkGatewayAuth, unauthorizedResponse } from "@/lib/gatewayAuth";
 
 // P1-01: the /seal page (gateway simulator) and every gateway/admin API route require HTTP
 // Basic Auth. This is the first line of defence; each route handler re-checks independently
-// (defence in depth — see src/lib/gatewayAuth.ts).
+// (defence in depth — see src/lib/gatewayAuth.ts). The same barrier also covers the doctor's
+// /inbox cabinet (real medical images, docs/SECURITY.md T11) and the client (hospital) cabinet
+// — one shared "internal staff" credential for every non-public page on this site.
 export function proxy(request: NextRequest) {
   const result = checkGatewayAuth(request.headers.get("authorization"));
   if (result.ok) return NextResponse.next();
@@ -20,5 +22,13 @@ export const config = {
     "/api/crash-test/:path*",
     "/api/passport",
     "/api/passport/:path*",
+    "/inbox",
+    "/api/inbox",
+    "/api/inbox/:path*",
+    "/api/automation",
+    "/api/automation/:path*",
+    "/client",
+    "/api/client",
+    "/api/client/:path*",
   ],
 };

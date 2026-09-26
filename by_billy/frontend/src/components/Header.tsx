@@ -1,24 +1,71 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLanguage } from "@/lib/language-context";
 import dictionary from "@/lib/dictionary";
+import { api } from "@/lib/api";
 import LanguageSwitch from "./LanguageSwitch";
 import AccessibilityPanel from "./AccessibilityPanel";
-import { ChartIcon, CrashTestIcon, InboxIcon, SealIcon, VerifyIcon } from "./icons";
+import { ChartIcon, CrashTestIcon, InboxIcon, PassportIcon, SealIcon, VerifyIcon } from "./icons";
 
 const LINKS = [
   { href: "/inbox", key: "inbox", icon: InboxIcon },
+  { href: "/client", key: "client", icon: PassportIcon },
   { href: "/seal", key: "seal", icon: SealIcon },
   { href: "/verify", key: "verify", icon: VerifyIcon },
   { href: "/crash-test", key: "crashTest", icon: CrashTestIcon, match: ["/crash-test", "/passport"] },
   { href: "/dashboard", key: "dashboard", icon: ChartIcon },
 ] as const;
 
+// The inbox lives behind Basic Auth (src/proxy.ts): polling it from every page, including the
+// public /check/[token] page, would pop up the browser's native credential prompt for a patient
+// who never asked for it. So the badge only starts polling once InboxPage itself has confirmed a
+// doctor session in this tab (see its setDoctorSession() call) — never before.
+const SESSION_KEY = "medseal-doctor-session";
+
+export function setDoctorSession() {
+  try {
+    sessionStorage.setItem(SESSION_KEY, "1");
+  } catch {
+    // storage blocked (private mode, etc.) — the badge simply never activates, which is safe
+  }
+}
+
+function useUnreadCount(pathname: string): number | null {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    let hasSession = false;
+    try {
+      hasSession = sessionStorage.getItem(SESSION_KEY) === "1";
+    } catch {
+      hasSession = false;
+    }
+    if (!hasSession) return;
+    let cancelled = false;
+    const poll = () => {
+      api
+        .getInbox({ limit: 1 })
+        .then((listing) => {
+          if (!cancelled) setCount(listing.counts.danger + listing.counts.warning);
+        })
+        .catch(() => undefined);
+    };
+    poll();
+    const timer = setInterval(poll, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [pathname]);
+  return count;
+}
+
 export default function Header() {
   const { t } = useLanguage();
   const pathname = usePathname();
+  const unread = useUnreadCount(pathname);
   const isActive = (l: (typeof LINKS)[number]) =>
     ("match" in l ? l.match : [l.href]).some((p) => pathname.startsWith(p));
   const linkClass = (active: boolean) =>
@@ -44,6 +91,14 @@ export default function Header() {
               <Link key={l.href} href={l.href} className={linkClass(active)} aria-current={active ? "page" : undefined}>
                 <Icon width={16} height={16} />
                 {t(dictionary.nav[l.key])}
+                {l.key === "inbox" && !!unread && (
+                  <span
+                    aria-label={t(dictionary.inbox.unreadAlerts).replace("{n}", String(unread))}
+                    className="flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white"
+                  >
+                    {unread}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -63,6 +118,14 @@ export default function Header() {
             <Link key={l.href} href={l.href} className={linkClass(active)} aria-current={active ? "page" : undefined}>
               <Icon width={16} height={16} />
               {t(dictionary.nav[l.key])}
+              {l.key === "inbox" && !!unread && (
+                <span
+                  aria-label={t(dictionary.inbox.unreadAlerts).replace("{n}", String(unread))}
+                  className="flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white"
+                >
+                  {unread}
+                </span>
+              )}
             </Link>
           );
         })}

@@ -6,17 +6,35 @@ import { Button, Card, DoctorNote, ErrorBox, Spinner, errorMessage } from "@/com
 import { useLanguage } from "@/lib/language-context";
 import dictionary, { localeOf } from "@/lib/dictionary";
 import { api, pngSrc } from "@/lib/api";
-import type { AutomationStatus, InboxItem, InboxListing, Severity, VerifyResponse } from "@/lib/types";
+import { setDoctorSession } from "@/components/Header";
+import type { AutomationStatus, InboxItem, InboxListing, InboxQuery, Severity, VerifyResponse } from "@/lib/types";
 import { InboxIcon } from "@/components/icons";
 
 const d = dictionary.inbox;
 const REFRESH_MS = 3000;
+const PAGE_SIZE = 50;
 
 const tone: Record<Severity, { bar: string; chip: string; dot: string }> = {
   danger: { bar: "border-l-danger", chip: "bg-danger/10 text-danger", dot: "bg-danger" },
   warning: { bar: "border-l-amber-400", chip: "bg-amber-100 text-amber-800", dot: "bg-amber-400" },
   ok: { bar: "border-l-ok", chip: "bg-ok/10 text-ok", dot: "bg-ok" },
 };
+
+const inputClass = "rounded-xl border border-border bg-white px-3 py-2 text-sm";
+
+function csvCell(v: unknown): string {
+  const s = String(v ?? "");
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function download(blobOrUrl: Blob | string, filename: string) {
+  const url = typeof blobOrUrl === "string" ? blobOrUrl : URL.createObjectURL(blobOrUrl);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
 
 function MultiDrop({ onFiles, busy }: { onFiles: (files: File[]) => void; busy: boolean }) {
   const { t } = useLanguage();
@@ -63,7 +81,7 @@ function MultiDrop({ onFiles, busy }: { onFiles: (files: File[]) => void; busy: 
 }
 
 function Detail({ item, onReviewed }: { item: InboxItem; onReviewed: () => void }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const [result, setResult] = useState<VerifyResponse | { error: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -103,6 +121,14 @@ function Detail({ item, onReviewed }: { item: InboxItem; onReviewed: () => void 
           </p>
         )}
         <DoctorNote />
+        <a
+          href={api.inboxItemPdfUrl(item.id, lang)}
+          target="_blank"
+          rel="noreferrer"
+          className="block text-center text-xs font-medium text-accent underline underline-offset-2"
+        >
+          {t(d.downloadPdf)}
+        </a>
         {!item.reviewed && (
           <Button variant="ghost" onClick={review} disabled={busy} className="w-full">
             {busy && <Spinner />}
@@ -114,35 +140,103 @@ function Detail({ item, onReviewed }: { item: InboxItem; onReviewed: () => void 
   );
 }
 
+type Batch = { total: number; done: number; ok: number; review: number; block: number; ids: number[] };
+
 export default function InboxPage() {
   const { t, lang } = useLanguage();
   const [listing, setListing] = useState<InboxListing | null>(null);
   const [auto, setAuto] = useState<AutomationStatus | null>(null);
   const [open, setOpen] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [batch, setBatch] = useState<Batch | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [severity, setSeverity] = useState<Severity | "">("");
+  const [since, setSince] = useState("");
+  const [until, setUntil] = useState("");
+  const [query, setQuery] = useState<InboxQuery>({});
 
-  const refresh = useCallback(() => {
-    api.getInbox().then(setListing).catch((e) => setError(errorMessage(e)));
-    api.getAutomation().then(setAuto).catch(() => undefined);
-  }, []);
+  const load = useCallback(
+    (extra: InboxQuery = {}, append = false) => {
+      const q = { ...query, ...extra, limit: PAGE_SIZE };
+      api
+        .getInbox(q)
+        .then((res) => {
+          setDoctorSession();
+          setListing((prev) => (append && prev ? { ...res, items: [...prev.items, ...res.items] } : res));
+          setError(null);
+        })
+        .catch((e) => setError(errorMessage(e)));
+      api.getAutomation().then(setAuto).catch(() => undefined);
+    },
+    [query]
+  );
 
   useEffect(() => {
-    refresh();
-    const timer = setInterval(refresh, REFRESH_MS); // folder automation adds items on its own
+    load();
+    const timer = setInterval(() => load(), REFRESH_MS); // folder automation adds items on its own
     return () => clearInterval(timer);
-  }, [refresh]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
+
+  const applyFilters = () => {
+    setQuery({ severity: severity || undefined, since: since || undefined, until: until || undefined });
+  };
+  const resetFilters = () => {
+    setSeverity("");
+    setSince("");
+    setUntil("");
+    setQuery({});
+  };
+  const loadMore = () => load({ offset: listing?.items.length ?? 0 }, true);
 
   const upload = async (files: File[]) => {
     setBusy(true);
     setError(null);
+    setBatch({ total: files.length, done: 0, ok: 0, review: 0, block: 0, ids: [] });
     try {
-      await api.uploadToInbox(files);
-      refresh();
+      for (const file of files) {
+        const [item] = await api.uploadToInbox([file]);
+        setBatch((b) =>
+          b && {
+            ...b,
+            done: b.done + 1,
+            ids: [...b.ids, item.id],
+            ok: b.ok + (item.severity === "ok" ? 1 : 0),
+            review: b.review + (item.severity === "warning" ? 1 : 0),
+            block: b.block + (item.severity === "danger" ? 1 : 0),
+          }
+        );
+      }
+      load();
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  const exportCsv = async () => {
+    const full = await api.getInbox({ ...query, limit: 500, offset: 0 }).catch((e) => {
+      setError(errorMessage(e));
+      return null;
+    });
+    if (!full) return;
+    const header = ["id", "file_name", "received_at", "status", "severity", "reasons", "device", "changed_tiles", "detective_probability", "reviewed"];
+    const rows = full.items.map((i) => [
+      i.id, i.file_name, i.received_at, i.status, i.severity, i.reasons.join(" "), i.device ?? "",
+      i.changed_tiles, i.detective_probability ?? "", i.reviewed ? "1" : "0",
+    ]);
+    const csv = [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\r\n");
+    download(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }), "medseal-inbox.csv");
+  };
+
+  const downloadBatchPdf = async () => {
+    if (!batch?.ids.length) return;
+    try {
+      const url = await api.batchPdfUrl(batch.ids, lang);
+      download(url, "medseal-batch.pdf");
+    } catch (e) {
+      setError(errorMessage(e));
     }
   };
 
@@ -156,6 +250,7 @@ export default function InboxPage() {
   };
 
   const counts = listing?.counts;
+  const volume = listing?.volume;
 
   return (
     <PageShell title={t(d.title)} subtitle={t(d.subtitle)} icon={InboxIcon}>
@@ -171,7 +266,64 @@ export default function InboxPage() {
           </div>
         )}
 
+        {volume && (
+          <div className="grid grid-cols-3 gap-3">
+            {([["today", d.volumeToday], ["week", d.volumeWeek], ["all", d.volumeAll]] as const).map(([k, label]) => (
+              <Card key={k} className="bg-white/60">
+                <p className="text-xs text-muted">{t(label)}</p>
+                <p className="mt-1 text-2xl font-semibold tracking-tight">{volume[k]}</p>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        <Card className="flex flex-wrap items-end gap-3">
+          <span className="text-xs font-semibold uppercase tracking-wide text-muted">{t(d.filters)}</span>
+          <select value={severity} onChange={(e) => setSeverity(e.target.value as Severity | "")} className={inputClass}>
+            <option value="">{t(d.filterAll)}</option>
+            <option value="danger">{t(d.danger)}</option>
+            <option value="warning">{t(d.warning)}</option>
+            <option value="ok">{t(d.ok)}</option>
+          </select>
+          <label className="flex items-center gap-1.5 text-xs text-muted">
+            {t(d.filterFrom)}
+            <input type="date" value={since} onChange={(e) => setSince(e.target.value)} className={inputClass} />
+          </label>
+          <label className="flex items-center gap-1.5 text-xs text-muted">
+            {t(d.filterTo)}
+            <input type="date" value={until} onChange={(e) => setUntil(e.target.value)} className={inputClass} />
+          </label>
+          <Button variant="dark" onClick={applyFilters}>{t(d.filterApply)}</Button>
+          <Button variant="ghost" onClick={resetFilters}>{t(d.filterReset)}</Button>
+          <span className="flex-1" />
+          <Button variant="ghost" onClick={exportCsv} disabled={!listing?.items.length}>
+            {t(d.exportCsv)}
+          </Button>
+        </Card>
+
         <MultiDrop onFiles={upload} busy={busy} />
+
+        {batch && (
+          <Card>
+            <p className="mb-2 flex items-center justify-between text-sm font-semibold">
+              <span>{t(d.batchMode)}</span>
+              <span className="font-normal text-muted">{t(d.batchProgress).replace("{done}", String(batch.done)).replace("{total}", String(batch.total))}</span>
+            </p>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${(100 * batch.done) / batch.total}%` }} />
+            </div>
+            <div className="mt-3 flex flex-wrap gap-4 text-sm">
+              <span className="text-ok">{t(d.batchOk)}: {batch.ok}</span>
+              <span className="text-amber-700">{t(d.batchReview)}: {batch.review}</span>
+              <span className="text-danger">{t(d.batchBlock)}: {batch.block}</span>
+              {!busy && batch.ids.length > 0 && (
+                <button onClick={downloadBatchPdf} className="ml-auto text-xs font-medium text-accent underline underline-offset-2">
+                  {t(d.batchDownloadPdf)}
+                </button>
+              )}
+            </div>
+          </Card>
+        )}
 
         {auto && (
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
@@ -191,7 +343,7 @@ export default function InboxPage() {
           </p>
         )}
 
-        {error && <ErrorBox message={error} onRetry={refresh} />}
+        {error && <ErrorBox message={error} onRetry={() => load()} />}
 
         {!listing && !error && (
           <p role="status" className="flex items-center gap-2 text-sm text-muted">
@@ -202,41 +354,48 @@ export default function InboxPage() {
         {listing && listing.items.length === 0 && <Card className="text-sm text-muted">{t(d.empty)}</Card>}
 
         {listing && listing.items.length > 0 && (
-          <ul className="space-y-2" aria-live="polite">
-            {listing.items.map((item) => (
-              <li
-                key={item.id}
-                className={`glass overflow-hidden rounded-2xl border-l-4 ${tone[item.severity].bar} ${item.reviewed ? "opacity-60" : ""}`}
-              >
-                <button
-                  type="button"
-                  onClick={() => setOpen(open === item.id ? null : item.id)}
-                  aria-expanded={open === item.id}
-                  className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-left"
+          <>
+            <ul className="space-y-2" aria-live="polite">
+              {listing.items.map((item) => (
+                <li
+                  key={item.id}
+                  className={`glass overflow-hidden rounded-2xl border-l-4 ${tone[item.severity].bar} ${item.reviewed ? "opacity-60" : ""}`}
                 >
-                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${tone[item.severity].dot}`} aria-hidden />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">{item.file_name}</span>
-                    <span className="block text-xs text-muted">{describe(item)}</span>
-                  </span>
-                  <span className="text-xs text-muted">
-                    {new Date(item.received_at).toLocaleTimeString(localeOf(lang))} ·{" "}
-                    {item.source === "folder" ? t(d.fromFolder) : t(d.fromUpload)}
-                    {item.device ? ` · ${item.device}` : ""}
-                  </span>
-                  {item.reviewed ? (
-                    <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600">{t(d.reviewed)}</span>
-                  ) : (
-                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${tone[item.severity].chip}`}>
-                      {t(d[item.severity])}
+                  <button
+                    type="button"
+                    onClick={() => setOpen(open === item.id ? null : item.id)}
+                    aria-expanded={open === item.id}
+                    className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-left"
+                  >
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${tone[item.severity].dot}`} aria-hidden />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold">{item.file_name}</span>
+                      <span className="block text-xs text-muted">{describe(item)}</span>
                     </span>
-                  )}
-                  <span className="text-xs font-medium text-accent">{open === item.id ? t(d.close) : t(d.open)}</span>
-                </button>
-                {open === item.id && <Detail item={item} onReviewed={refresh} />}
-              </li>
-            ))}
-          </ul>
+                    <span className="text-xs text-muted">
+                      {new Date(item.received_at).toLocaleTimeString(localeOf(lang))} ·{" "}
+                      {item.source === "folder" ? t(d.fromFolder) : t(d.fromUpload)}
+                      {item.device ? ` · ${item.device}` : ""}
+                    </span>
+                    {item.reviewed ? (
+                      <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs text-slate-600">{t(d.reviewed)}</span>
+                    ) : (
+                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${tone[item.severity].chip}`}>
+                        {t(d[item.severity])}
+                      </span>
+                    )}
+                    <span className="text-xs font-medium text-accent">{open === item.id ? t(d.close) : t(d.open)}</span>
+                  </button>
+                  {open === item.id && <Detail item={item} onReviewed={() => load()} />}
+                </li>
+              ))}
+            </ul>
+            {listing.items.length >= PAGE_SIZE && listing.items.length < listing.counts.total && (
+              <div className="text-center">
+                <Button variant="ghost" onClick={loadMore}>{t(d.loadMore)}</Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </PageShell>
