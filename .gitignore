@@ -35,3 +35,5 @@ contracts/node.log
 
 # pitch / jury prep material — kept locally, not part of the submitted project
 /*.pdf
+# the hackathon presentation itself is part of the submission
+!/MedSeal.pdf
