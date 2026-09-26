@@ -33,6 +33,7 @@ Keys: generated server-side, one key per device, stored outside the repo (`keys/
 ## Honest limits (say them if asked — it builds trust)
 - An image altered **before** the seal (compromised scanner) is not detectable by the seal → that's why the gateway sits next to the scanner and the detective exists.
 - Detective and shield are probabilistic, not proofs.
+- The shield raises false alarms on ~1 in 5 clean full-resolution (1024 px) DICOMs, vs ~1% on the 300 px images it was calibrated on — tuned to miss no attack rather than to stay quiet (numbers: `ARCHITECTURE.md` §6).
 - Ed25519/SHA-256 are not post-quantum; migration path: ML-DSA (NIST FIPS 204) signatures — the seal format has a `alg` field for this.
 
 ## Audit log

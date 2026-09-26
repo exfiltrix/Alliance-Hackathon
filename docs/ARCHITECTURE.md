@@ -143,6 +143,17 @@ Seal/verify < 50 ms per image; shield < 1 s; crash test 50 images < 2 min on CPU
 - **Shield not proven robust to an adaptive attacker.** Every shield result carries
   `adaptive_attack_tested: false`; AI-03 (PGD against the shield itself via a BPDA
   approximation) is not implemented in this environment (no local torch install).
+- **Shield false alarms on full-resolution X-rays.** The threshold (10.419) was calibrated on
+  300 px NIH images (~1% false alarms). On clean 1024 px RSNA Pneumonia DICOMs (the same NIH
+  source at full resolution, n=300) it flags **18–22%**: a single area resize 1024→224 keeps
+  sensor grain that the 3×3 median wipes, so the logits move. Two fixes were measured
+  (2026-09-26) and rejected: (a) resizing large inputs via 300 px first brings false alarms to
+  1.3% but blurs detail the model needs (Pneumonia AUC on RSNA 0.864→0.834, positives drop
+  from ~0.8–0.96 to ~0.52); (b) a separate threshold for large inputs (p99 on RSNA = 23.55)
+  gives 0% false alarms but catches only 11–28% of eps=1 attacks made at full resolution
+  (vs 85–100% now). Kept as is: a false alarm only asks the doctor to recheck, a missed
+  attack does not. A real fix needs a resolution-aware detector, calibrated and attack-tested
+  on full-resolution images.
 - **Detective is not validated on real forgeries.** Trained and measured only on synthetic
   edits; `experimental: true` is hardcoded and the passport/UI never treat it as more than a
   probability.
