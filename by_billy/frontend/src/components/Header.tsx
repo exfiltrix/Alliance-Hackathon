@@ -8,7 +8,7 @@ import dictionary from "@/lib/dictionary";
 import { api } from "@/lib/api";
 import LanguageSwitch from "./LanguageSwitch";
 import AccessibilityPanel from "./AccessibilityPanel";
-import { ChartIcon, CrashTestIcon, InboxIcon, PassportIcon, SealIcon, VerifyIcon } from "./icons";
+import { ChartIcon, CrashTestIcon, InboxIcon, PassportIcon, PriceTagIcon, SealIcon, VerifyIcon } from "./icons";
 
 const LINKS = [
   { href: "/inbox", key: "inbox", icon: InboxIcon },
@@ -17,6 +17,7 @@ const LINKS = [
   { href: "/verify", key: "verify", icon: VerifyIcon },
   { href: "/crash-test", key: "crashTest", icon: CrashTestIcon, match: ["/crash-test", "/passport"] },
   { href: "/dashboard", key: "dashboard", icon: ChartIcon },
+  { href: "/pricing", key: "pricing", icon: PriceTagIcon },
 ] as const;
 
 // The inbox lives behind Basic Auth (src/proxy.ts): polling it from every page, including the

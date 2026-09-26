@@ -110,3 +110,12 @@ export function InboxIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+export function PriceTagIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0L3 13V3h10l7.6 7.6a2 2 0 010 2.8z" />
+      <circle cx="7.5" cy="7.5" r="1.5" />
+    </svg>
+  );
+}
