@@ -109,8 +109,21 @@ Folders (backend setting `MEDSEAL_WATCH_DIR`, default `data/watch`), polled ever
 `POST /automation/run` → process both folders now → `{sealed, verified}`
 
 ## Inbox (doctor)
-`POST /inbox` — multipart, field `files` (repeat, max 50) → the new items, most urgent first.
-`GET /inbox` → `{counts: {danger, warning, ok, total}, items: [item]}` — counts are unreviewed only; order: unreviewed, then danger → warning → ok, then newest.
+`POST /inbox` — multipart, field `files` (repeat, max 50) → the new items, most urgent first. The
+frontend's batch-check flow posts one file at a time (same endpoint, one-element `files` each call)
+so it can show real per-file progress and bucket results as they land, instead of waiting for the
+whole batch in one request.
+
+`GET /inbox?limit=200&offset=0&severity=&reviewed=&since=&until=` →
+```json
+{ "counts": { "danger": 0, "warning": 1, "ok": 4, "total": 5 },
+  "volume": { "today": 5, "week": 5, "all": 5 },
+  "items": [ /* item, see below */ ] }
+```
+- `counts` are over **unreviewed** items only (the doctor's actual work queue); order: unreviewed, then danger → warning → ok, then newest.
+- `volume` is a raw activity count (checks that finished, any severity) for the summary tiles — today (last 24h), this week (last 7d), all-time.
+- `since`/`until` — plain `YYYY-MM-DD`, inclusive, filtering on `received_at`; `422` for anything else. `offset`/`limit` — plain pagination, `limit` capped at 500.
+
 `GET /inbox/{id}` → item + `result` (the full `/verify` response, or `{error}` for unreadable files) · `POST /inbox/{id}/review` → item with `reviewed: true`.
 ```json
 { "id": 7, "file_name": "patient_A.png", "source": "upload | folder", "received_at": "…",
@@ -119,6 +132,47 @@ Folders (backend setting `MEDSEAL_WATCH_DIR`, default `data/watch`), polled ever
   "reviewed": false, "device": "Shlyuz-Auto", "changed_tiles": 0, "detective_probability": null, "error": null }
 ```
 - danger = tampered / forged / shield attack / unreadable; warning = unsigned (detective gives a probability) or device revoked later; ok = authentic and shield quiet.
+
+`GET /inbox/{id}/pdf?lang=uz|ru` → one-page PDF report for this check (same content as the detail
+view: status, severity, reasons, device, changed tiles, detective probability, the rendered preview
+with its red boxes, and the doctor-decides note).
+`POST /inbox/batch-pdf?lang=uz|ru` — body `{ids: [7, 8, 9]}` (max 50) → one PDF, one page per id, in
+the given order. `404` if any id does not exist (nothing is generated for a partially-valid batch).
+
+## Client cabinet (hospital/clinic, org-level)
+
+A separate role from the doctor: an org-level login for the hospital that owns the devices, not for
+one doctor. Scoped to exactly one `hospital` string (the same free-text value already stored on
+`Device.hospital` and `Passport.organisation`) — a client account can only ever see its own
+organisation's devices, stats, alerts and passports.
+
+`POST /clients` — admin token, body `{hospital}` → `201` `{id, hospital, created_at, token}` — the
+bearer token is returned **only in this response**; only its sha256 is stored, exactly like a device
+token (`POST /devices`). `409` if a client account for that hospital already exists.
+
+Every endpoint below requires `Authorization: Bearer <client token>`, or the admin token **plus**
+`?org=<hospital>` (the admin token may inspect any organisation, but must name it — it never
+defaults to "everything"). `401` without a valid token, `400` for the admin token with no `org`.
+
+`GET /client/devices` → `[{id, name, revoked, certified, created_at, last_seal_at, seal_count}]` — this
+organisation's own devices only. `certified` = the device has a valid root-signed certificate (CRY-02).
+
+`GET /client/stats` →
+```json
+{ "hospital": "…",
+  "devices": { "total": 3, "active": 2, "revoked": 1, "certified": 2 },
+  "seals": { "today": 4, "7d": 21, "total": 130 },
+  "verifications": { "total": 40, "by_result": { "authentic": 35, "tampered": 3, "forged": 2 } } }
+```
+`verifications` counts only checks of this organisation's **own** sealed images (joined on the seal's
+`uid`) — a doctor elsewhere checking someone else's image never counts toward these numbers.
+
+`GET /client/alerts?limit=50` → `[{at, seal_id, uid, device, result, shield_flag}]` — newest first, only
+non-`authentic` outcomes for this organisation's own sealed images (tampered / forged checks elsewhere).
+
+`GET /client/passports` → same summary shape as `GET /passports`, filtered to
+`Passport.organisation == hospital`. Issuing a passport (`POST /passport`, admin-only) still sets
+`organisation` explicitly — matching a client account's hospital name is what makes it visible here.
 
 ## Public QR check (patients, no login)
 `POST /seal` also returns `check_token` (random, not the seal id). Frontend page: `/check/{check_token}`.
