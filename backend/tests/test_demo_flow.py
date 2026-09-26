@@ -59,6 +59,20 @@ def test_demo_flow(client, device, chain, tmp_path):
     assert inbox[0]["severity"] == "danger"
 
 
+def test_tamper_demo_on_dicom_shows_the_fake(client, device, ct_path, tmp_path):
+    """Step 2 with a DICOM: the painted nodule keeps SOPInstanceUID, so /verify boxes exactly those tiles."""
+    verify = lambda path: client.post("/api/verify", files={"file": ("x.dcm", path.read_bytes())}).json()
+    body = client.post("/api/seal", files={"file": ("ct.dcm", open(ct_path, "rb").read())}, headers=device["auth"]).json()
+    original = tmp_path / "ct.dcm"
+    original.write_bytes(client.get(body["download_url"], headers=device["auth"]).content)
+
+    run_script("scripts.tamper_demo", str(original), tmp_path=tmp_path)
+    r = verify(tmp_path / "ct_tampered.dcm")
+    assert r["status"] == "tampered" and r.get("reason") is None
+    assert 0 < len(r["changed_tiles"]) < 64  # the nodule only, not the whole 128x128 image (64 tiles)
+    assert verify(original)["status"] == "authentic"
+
+
 def test_frontend_has_text_for_every_forged_reason():
     """The verify page renders t(d.forgedReasons[reason]): a reason without text crashes it."""
     if not DICTIONARY.exists():
