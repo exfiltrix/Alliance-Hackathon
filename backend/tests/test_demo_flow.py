@@ -8,7 +8,7 @@ import sys
 import pytest
 
 from app.config import BACKEND_DIR, settings
-from tests.conftest import admin_headers, xray_png
+from tests.conftest import admin_headers, doctor_headers, xray_png
 
 DICTIONARY = BACKEND_DIR.parent / "by_billy" / "frontend" / "src" / "lib" / "dictionary.ts"
 # Every `reason` /verify can return with status "forged" (docs/API.md).
@@ -54,7 +54,8 @@ def test_demo_flow(client, device, chain, tmp_path):
     assert (r["status"], r["reason"]) == ("forged", "blockchain_mismatch")  # /verify only consults the chain
     assert client.get(f"/api/check/{body['check_token']}").json()["reason"] == "blockchain_mismatch"  # patient QR too
 
-    inbox = client.post("/api/inbox", files=[("files", ("fake.png", fake.read_bytes()))]).json()
+    inbox = client.post("/api/inbox", files=[("files", ("fake.png", fake.read_bytes()))],
+                        headers=doctor_headers()).json()
     assert inbox[0]["severity"] == "danger"
 
 

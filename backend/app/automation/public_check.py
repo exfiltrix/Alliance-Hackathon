@@ -9,6 +9,7 @@ import json
 import secrets
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.imaging import LoadedImage
@@ -18,12 +19,24 @@ from app.verify.service import _check_row, verify_upload
 
 
 def token_for(session: Session, seal_id: int) -> str:
-    """The seal's check token, created on first use."""
+    """The seal's check token, created on first use.
+
+    seal_id is UNIQUE here, so two concurrent seals of the same image (the idempotent path returns
+    one row) would both insert and one would get a raw IntegrityError -> 500. Re-read on conflict.
+    """
     row = session.scalar(select(PublicCheck).where(PublicCheck.seal_id == seal_id))
-    if row is None:
-        row = PublicCheck(token=secrets.token_urlsafe(12), seal_id=seal_id)
-        session.add(row)
+    if row is not None:
+        return row.token
+    row = PublicCheck(token=secrets.token_urlsafe(12), seal_id=seal_id)
+    session.add(row)
+    try:
         session.commit()
+    except IntegrityError:
+        session.rollback()
+        existing = session.scalar(select(PublicCheck).where(PublicCheck.seal_id == seal_id))
+        if existing is None:  # lost to a concurrent delete: let the caller see the real error
+            raise
+        return existing.token
     return row.token
 
 

@@ -48,6 +48,11 @@ class Settings:
     admin_token: str = field(default=os.environ.get("MEDSEAL_ADMIN_TOKEN", ""), repr=False)
     # Optional HMAC salt used to bind a DICOM PatientID without storing it. Keep it stable.
     patient_salt: str = os.environ.get("MEDSEAL_PATIENT_SALT", "")
+    # Bearer token for the doctor's cabinet (GET/POST /inbox, /inbox/{id}, review, /automation).
+    # Like admin_token it has no default: unset means those endpoints refuse every request, so a
+    # deployment can never end up with a public inbox full of medical images. The admin token is
+    # also accepted, so one operator can hold both roles.
+    doctor_token: str = field(default=os.environ.get("MEDSEAL_DOCTOR_TOKEN", ""), repr=False)
     # Root signing material. The private key stays in the gateway/HSM; verifiers use root.pub only.
     root_key_path: Path = _path("MEDSEAL_ROOT_KEY_PATH", BACKEND_DIR / "keys" / "root.pem")
     root_pubkey_path: Path = _path("MEDSEAL_ROOT_PUBKEY_PATH", BACKEND_DIR / "keys" / "root.pub")

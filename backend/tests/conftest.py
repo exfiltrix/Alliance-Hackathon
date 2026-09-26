@@ -11,6 +11,7 @@ from app.config import settings
 
 
 ADMIN_TOKEN = "test-admin-token"
+DOCTOR_TOKEN = "test-doctor-token"
 
 
 @pytest.fixture
@@ -25,6 +26,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "require_device_cert", True)
     monkeypatch.setattr(settings, "ai_enabled", False)  # AI tests switch it on themselves
     monkeypatch.setattr(settings, "admin_token", ADMIN_TOKEN)
+    monkeypatch.setattr(settings, "doctor_token", DOCTOR_TOKEN)
     monkeypatch.setattr(settings, "watch_enabled", False)  # tests call watcher.run_once() themselves
     monkeypatch.setattr(settings, "watch_dir", tmp_path / "watch")
     monkeypatch.setattr(settings, "warmup", False)
@@ -41,6 +43,11 @@ def client(tmp_path, monkeypatch):
 
 def admin_headers():
     return {"Authorization": f"Bearer {ADMIN_TOKEN}"}
+
+
+def doctor_headers():
+    """The doctor's cabinet (/inbox, /automation) requires its own token — never anonymous."""
+    return {"Authorization": f"Bearer {DOCTOR_TOKEN}"}
 
 
 @pytest.fixture

@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.automation import public_check
 from app.db import get_session
@@ -26,7 +27,8 @@ def check(token: str, session: Session = Depends(get_session)):
 @router.post("/check/{token}")
 async def check_file(token: str, file: UploadFile = File(...), session: Session = Depends(get_session)):
     seal = _seal(session, token)
-    return public_check.check_file(session, seal, await read_upload(file))
+    # Verification decodes, hashes and may run the AI: off the event loop, like POST /verify.
+    return await run_in_threadpool(public_check.check_file, session, seal, await read_upload(file))
 
 
 @router.get("/check/{token}/qr.png")

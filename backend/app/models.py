@@ -108,6 +108,23 @@ class Passport(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class ClientAccount(Base):
+    """One organisation-level login for the client cabinet (docs/API.md "Client cabinet").
+
+    Scoped to exactly one hospital string (the same free-text value stored on Device.hospital and
+    Passport.organisation): every client-cabinet endpoint filters by it, so one organisation can
+    never see another's devices, stats or passports. Created by an admin only (POST /clients),
+    same pattern as a device token: the bearer token is returned once and only its sha256 is kept.
+    """
+
+    __tablename__ = "client_accounts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    hospital: Mapped[str] = mapped_column(String(300), unique=True)
+    token_hash: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class PublicCheck(Base):
     """Random, unguessable link token for the patient-facing QR check of one seal.
     Kept outside the seals table so the ledger record (and its hash chain) is untouched."""
@@ -128,12 +145,20 @@ class InboxItem(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     file_name: Mapped[str] = mapped_column(String(300))
     source: Mapped[str] = mapped_column(String(16))  # upload | folder
-    status: Mapped[str] = mapped_column(String(16))  # authentic / tampered / unsigned / forged / error
-    severity: Mapped[str] = mapped_column(String(8), index=True)  # danger / warning / ok
+    # Lifecycle of the automatic pipeline, not of the image: new -> processing -> done | failed.
+    # The doctor's triage (severity/status) is a separate axis and stays as it was. While a row is
+    # still being verified, status/severity hold the PENDING placeholder — the row is committed
+    # before the slow work so a crash shows up as stuck instead of vanishing (see automation.inbox).
+    state: Mapped[str] = mapped_column(String(12), default="done")
+    status: Mapped[str] = mapped_column(String(16), default="processing")  # authentic/tampered/unsigned/forged/error
+    severity: Mapped[str] = mapped_column(String(16), default="processing", index=True)  # danger/warning/ok
     reasons_json: Mapped[str] = mapped_column(Text, default="[]")  # why it needs attention (codes)
     result_json: Mapped[str] = mapped_column(Text, default="{}")  # full /verify response, incl. preview
+    # The few listing fields, so GET /inbox never has to parse result_json (which carries a
+    # ~100 KB base64 preview per row) just to read four scalars.
+    summary_json: Mapped[str] = mapped_column(Text, default="{}")
     reviewed: Mapped[bool] = mapped_column(Boolean, default=False)
-    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
 class Anchor(Base):

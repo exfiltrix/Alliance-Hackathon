@@ -2,7 +2,7 @@
 import pytest
 
 from app.automation import inbox, watcher
-from tests.conftest import png_pixels, replace_png_pixels, xray_png
+from tests.conftest import doctor_headers, png_pixels, replace_png_pixels, xray_png
 
 
 def seal(client, device, data):
@@ -40,7 +40,7 @@ def test_batch_upload_ranks_by_urgency(client, device):
         ("files", ("tampered.png", tampered_copy(client, device, meta))),
         ("files", ("junk.png", b"not an image")),
     ]
-    r = client.post("/api/inbox", files=files)
+    r = client.post("/api/inbox", files=files, headers=doctor_headers())
     assert r.status_code == 200, r.text
     got = [(i["file_name"], i["severity"], i["status"]) for i in r.json()]
     assert [s for _, s, _ in got] == ["danger", "danger", "warning", "ok"]
@@ -48,18 +48,18 @@ def test_batch_upload_ranks_by_urgency(client, device):
         "good.png": "authentic", "unsigned.png": "unsigned", "tampered.png": "tampered", "junk.png": "error",
     }
 
-    listing = client.get("/api/inbox").json()
+    listing = client.get("/api/inbox", headers=doctor_headers()).json()
     assert listing["counts"] == {"danger": 2, "warning": 1, "ok": 1, "total": 4}
     first = listing["items"][0]
     assert first["severity"] == "danger"
 
-    detail = client.get(f"/api/inbox/{first['id']}").json()
+    detail = client.get(f"/api/inbox/{first['id']}", headers=doctor_headers()).json()
     assert "result" in detail
-    assert client.post(f"/api/inbox/{first['id']}/review").json()["reviewed"] is True
-    listing = client.get("/api/inbox").json()
+    assert client.post(f"/api/inbox/{first['id']}/review", headers=doctor_headers()).json()["reviewed"] is True
+    listing = client.get("/api/inbox", headers=doctor_headers()).json()
     assert listing["counts"]["danger"] == 1  # reviewed items no longer count
     assert listing["items"][-1]["id"] == first["id"]  # and sink to the bottom
-    assert client.get("/api/inbox/999").status_code == 404
+    assert client.get("/api/inbox/999", headers=doctor_headers()).status_code == 404
 
 
 def test_folders_seal_then_verify_without_any_click(client, monkeypatch):
@@ -73,14 +73,14 @@ def test_folders_seal_then_verify_without_any_click(client, monkeypatch):
     assert (watcher.scanner_dir() / "processed" / "patient1.png").exists()
     assert (watcher.scanner_dir() / "failed" / "broken.png").exists()
     assert (watcher.incoming_dir() / "processed" / "patient1.png").exists()
-    items = client.get("/api/inbox").json()["items"]
+    items = client.get("/api/inbox", headers=doctor_headers()).json()["items"]
     assert [(i["file_name"], i["status"], i["severity"], i["source"]) for i in items] == [
         ("patient1.png", "authentic", "ok", "folder")
     ]
     assert items[0]["device"] == "Shlyuz-Auto"
     assert watcher.run_once() == (0, 0)  # nothing new
 
-    status = client.get("/api/automation").json()
+    status = client.get("/api/automation", headers=doctor_headers()).json()
     assert status["sealed"] >= 1 and status["gateway"] == "Shlyuz-Auto"
 
 

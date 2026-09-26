@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
 from app import audit
-from app.auth import require_device, require_device_or_admin
+from app.auth import require_device, require_device_or_admin, require_seal_owner
 from app.automation.public_check import token_for
 from app.config import settings
 from app.db import get_session
@@ -57,8 +57,10 @@ async def seal(
     return seal_json(row) | {"seal_ms": round(elapsed_ms, 2), "check_token": token_for(session, row.id)}
 
 
-@router.get("/seal/{seal_id}/file", dependencies=[Depends(require_device_or_admin)])
+@router.get("/seal/{seal_id}/file", dependencies=[Depends(require_seal_owner)])
 def seal_file(seal_id: int, session: Session = Depends(get_session)):
+    """The sealed original. Only the device that produced it, or an admin, may read it — any
+    device token would be a horizontal IDOR across hospitals (docs/SECURITY.md T-tokens)."""
     row = session.get(Seal, seal_id)
     if row is None or not (path := settings.storage_dir / row.file_name).exists():
         raise HTTPException(404, "Sealed file not found")
