@@ -28,6 +28,12 @@ def record_bytes(row: Seal) -> bytes:
         "meta": row.meta_json,
         "sig": row.sig_hex,
     }
+    if (row.sig_version or 1) < 2 and (row.meta_version or 1) < 2 and not row.meta_hash_hex:
+        # Rows sealed before P0-5 (3e3cbf7) were hashed without the meta fields, which the column
+        # migration later filled with ""/"{}": hashing them in would flag a genuine row as
+        # ledger_entry_modified. Every row sealed since has a non-empty meta_hash, and blanking it
+        # changes these bytes anyway, so this cannot be used to rewrite a newer row.
+        del values["meta_hash"], values["meta"]
     if (row.sig_version or 1) >= 2 or (row.meta_version or 1) >= 2:
         values.update(
             {

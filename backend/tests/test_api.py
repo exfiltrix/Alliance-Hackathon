@@ -180,6 +180,46 @@ def test_v1_seal_still_verifies_with_its_original_message_format(client, device)
     assert bad["status"] == "forged" and bad["reason"] == "bad_signature"
 
 
+def test_seal_from_before_p0_5_is_not_reported_as_forged(client, device):
+    """A row sealed on day 1 (before meta_hash/meta joined record_bytes) keeps its original
+    entry_hash; the later column migration filled meta with ""/"{}". It must verify authentic,
+    not forged/ledger_entry_modified, and still catch a real edit."""
+    import hashlib
+
+    from app.models import iso_utc
+    from app.seal import ledger
+
+    body, sealed = seal(client, device, xray_png(seed=31))
+    with db.SessionLocal() as session:
+        row = session.get(Seal, body["seal_id"])
+        # Rebuild the row exactly as day-1 code wrote it: v1 signature over root + uid only.
+        from app.imaging import load_image
+        from app.seal import core, keys
+
+        image = load_image(sealed)
+        record = core.seal(image.px, row.uid, keys.load_private_key(device["id"]))
+        row.sig_version, row.meta_version = 1, 1
+        row.meta_hash_hex, row.meta_json, row.patient_ref = "", "{}", ""
+        row.sig_hex = record["sig"].hex()
+        day1 = json.dumps(
+            {"uid": row.uid, "device_id": row.device_id, "created_at": iso_utc(row.created_at),
+             "shape": row.shape, "dtype": row.dtype, "tile": row.tile, "leaves": row.leaves_json,
+             "root": row.root_hex, "sig": row.sig_hex},
+            sort_keys=True, separators=(",", ":"),
+        ).encode()
+        row.entry_hash = hashlib.sha256(row.prev_hash.encode() + day1).hexdigest()
+        assert ledger.entry_hash(row.prev_hash, row) == row.entry_hash
+        session.commit()
+    # PNG meta fields are not compared for rows without a stored meta_hash.
+    assert verify(client, sealed)["status"] == "authentic"
+
+    with db.SessionLocal() as session:
+        session.get(Seal, body["seal_id"]).tile = 16  # a real edit, entry_hash left alone
+        session.commit()
+    result = verify(client, sealed)
+    assert (result["status"], result["reason"]) == ("forged", "ledger_entry_modified")
+
+
 def test_v2_signature_binds_created_at(client, device):
     body, sealed = seal(client, device, xray_png(seed=24))
     with db.SessionLocal() as session:
